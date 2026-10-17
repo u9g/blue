@@ -795,7 +795,7 @@ Technology decided then.
 
 ## 15. Open questions (none block phases 0–3)
 
-1. ~~GitHub repo~~ — `u9g/blue` (private).
+1. ~~GitHub repo~~ — `u9g/blue` (public).
 2. A GitHub OAuth App for sign-in (github.com/settings/developers → New OAuth App, enable
    device flow) and your GitHub user id for the allowlist. Needed in phase 2.
 3. Server hostname and the cluster's cert-manager `ClusterIssuer` name.
