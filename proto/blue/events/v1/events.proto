@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package blue.events.v1;
+
+// Lifecycle state of a session as seen by the daemon that owns it.
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  SESSION_STATE_STARTING = 1;
+  SESSION_STATE_IDLE = 2;
+  SESSION_STATE_RUNNING = 3;
+  SESSION_STATE_CLOSED = 4;
+  SESSION_STATE_FAILED = 5;
+}
+
+// A session event, produced by the daemon by translating raw Agent SDK messages.
+// Shared by the daemon, the server, and every client.
+message SessionEvent {
+  oneof kind {
+    SessionStarted session_started = 1;
+    TurnStarted turn_started = 2;
+    AssistantText assistant_text = 3;
+    ToolStarted tool_started = 4;
+    ToolFinished tool_finished = 5;
+    TurnCompleted turn_completed = 6;
+    TurnFailed turn_failed = 7;
+    TurnInterrupted turn_interrupted = 8;
+    SessionStateChanged session_state_changed = 9;
+    RawSdkMessage raw_sdk_message = 10;
+  }
+}
+
+// The Claude session is live; carries the id needed to resume it later.
+message SessionStarted {
+  string claude_session_id = 1;
+  string model = 2;
+  string cwd = 3;
+}
+
+message TurnStarted {
+  string turn_id = 1;
+}
+
+// A complete assistant text block (never a partial delta).
+message AssistantText {
+  string text = 1;
+}
+
+message ToolStarted {
+  string tool_use_id = 1;
+  // Tool name as reported by the SDK, e.g. "Edit", "Bash".
+  string tool = 2;
+  // Short human-readable description, e.g. "Edit src/main.rs" or "Bash: cargo test".
+  string summary = 3;
+}
+
+message ToolFinished {
+  string tool_use_id = 1;
+  bool is_error = 2;
+}
+
+message TurnCompleted {
+  string turn_id = 1;
+  string result_text = 2;
+  uint64 duration_ms = 3;
+  uint32 num_turns = 4;
+  optional double cost_usd = 5;
+}
+
+message TurnFailed {
+  string turn_id = 1;
+  string reason = 2;
+}
+
+message TurnInterrupted {
+  string turn_id = 1;
+}
+
+message SessionStateChanged {
+  SessionState state = 1;
+}
+
+// An Agent SDK message forwarded verbatim. The SDK owns this shape, so it stays opaque JSON.
+message RawSdkMessage {
+  string json = 1;
+}

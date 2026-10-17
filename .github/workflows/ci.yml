@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  proto:
+    name: Proto lint + generated code is fresh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - uses: astral-sh/setup-uv@v6
+      - run: bun install --frozen-lockfile
+      - run: bun run proto:lint
+      - run: bun run proto:ts
+      - run: uv sync --locked --project voice
+      - run: uv run --project voice python voice/scripts/gen_proto.py
+      - name: Fail if generated code is stale
+        run: git diff --exit-code -- bridge/src/gen voice/src/blue
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  bridge:
+    name: Bridge (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+        working-directory: bridge
+      - run: bun test
+        working-directory: bridge
+
+  voice:
+    name: Voice agent (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: voice
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run pytest -q
+
+  handshake:
+    name: Daemon ⇄ compiled bridge handshake (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+        working-directory: bridge
+      # Blue requires Claude Code to be installed already; doctor fails without it.
+      # `--version` needs no login.
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge${{ runner.os == 'Windows' && '.exe' || '' }}

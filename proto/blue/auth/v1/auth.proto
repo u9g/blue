@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package blue.auth.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Users sign in with GitHub only. The server runs GitHub's OAuth device flow on the client's
+// behalf, checks the GitHub account against its allowlist, and issues a Blue session token.
+// Clients never see a GitHub token.
+//
+// Session tokens are sent as `authorization: Bearer <session token>` metadata.
+service AuthService {
+  // Signs in with GitHub. The first response carries the code to enter at GitHub; the server
+  // then polls GitHub and sends a final response with the session token.
+  //
+  // Errors: PERMISSION_DENIED if the GitHub account is not allowed, DEADLINE_EXCEEDED if the
+  // code expires, ABORTED if the user declines on GitHub.
+  rpc LoginWithGitHub(LoginWithGitHubRequest) returns (stream LoginWithGitHubResponse);
+  // Revokes the calling session token.
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // Returns the signed-in user. Requires a session token.
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+  // Mints a LiveKit room token that dispatches the voice agent. Requires a session token.
+  rpc CreateLiveKitToken(CreateLiveKitTokenRequest) returns (CreateLiveKitTokenResponse);
+  // One-time code for pairing a new daemon. Requires a session token.
+  rpc CreatePairingCode(CreatePairingCodeRequest) returns (CreatePairingCodeResponse);
+  // Exchanges a pairing code for a machine token. Authenticated by the code itself.
+  rpc ClaimPairingCode(ClaimPairingCodeRequest) returns (ClaimPairingCodeResponse);
+  // Revokes a machine token and drops its stream. Requires a session token.
+  rpc RevokeMachine(RevokeMachineRequest) returns (RevokeMachineResponse);
+}
+
+message User {
+  // GitHub's numeric user id; stable across username changes.
+  int64 github_id = 1;
+  string github_login = 2;
+  string name = 3;
+  string avatar_url = 4;
+}
+
+message LoginWithGitHubRequest {
+  // Shown in the session list, e.g. "blue CLI on desktop".
+  string client_name = 1;
+}
+
+message LoginWithGitHubResponse {
+  oneof step {
+    DeviceCode device_code = 1;
+    LoginComplete complete = 2;
+  }
+}
+
+// Ask the user to open verification_uri and enter user_code.
+message DeviceCode {
+  string user_code = 1;
+  string verification_uri = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message LoginComplete {
+  string session_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  User user = 3;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {}
+
+message GetCurrentUserRequest {}
+
+message GetCurrentUserResponse {
+  User user = 1;
+}
+
+message CreateLiveKitTokenRequest {
+  // Defaults to a fresh room name.
+  optional string room_name = 1;
+}
+
+message CreateLiveKitTokenResponse {
+  string token = 1;
+  string livekit_url = 2;
+  string room_name = 3;
+}
+
+message CreatePairingCodeRequest {}
+
+message CreatePairingCodeResponse {
+  string code = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message ClaimPairingCodeRequest {
+  string code = 1;
+  string machine_name = 2;
+}
+
+message ClaimPairingCodeResponse {
+  string machine_id = 1;
+  string machine_token = 2;
+}
+
+message RevokeMachineRequest {
+  // Machine id or name.
+  string machine = 1;
+}
+
+message RevokeMachineResponse {}

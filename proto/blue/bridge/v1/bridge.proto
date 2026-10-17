@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package blue.bridge.v1;
+
+// Daemon <-> claude-bridge protocol over the bridge's stdin/stdout.
+//
+// Framing: every frame is a varint length prefix followed by one encoded message
+// ("size-delimited"). stdout carries only frames; the bridge logs to stderr.
+// One bridge process hosts exactly one session.
+
+message DaemonToBridge {
+  oneof command {
+    Start start = 1;
+    Prompt prompt = 2;
+    Interrupt interrupt = 3;
+    Close close = 4;
+  }
+}
+
+message BridgeToDaemon {
+  oneof event {
+    Ready ready = 1;
+    SdkMessage sdk_message = 2;
+    Error error = 3;
+    Exited exited = 4;
+  }
+}
+
+// Starts the Agent SDK query. Must be the first command, sent once.
+// Claude always starts in the user's home directory and may work anywhere on the machine.
+message Start {
+  string session_id = 1;
+  // Absolute path to the machine's installed `claude`, resolved by the daemon and passed to the
+  // SDK as pathToClaudeCodeExecutable. Required: Blue never uses the SDK's bundled copy of
+  // Claude Code, so the bridge rejects a Start without it.
+  string claude_path = 2;
+  // Claude session id to resume, if continuing an existing conversation.
+  optional string resume_claude_session_id = 3;
+  optional string model = 4;
+}
+
+// Sends one user turn into the running query.
+// The bridge runs one turn at a time and doesn't track turn ids; the daemon knows which turn
+// is in progress and tags events with it.
+message Prompt {
+  string text = 1;
+}
+
+// Interrupts the current turn (query.interrupt()).
+message Interrupt {}
+
+// Ends the input stream; the bridge finishes and exits 0.
+message Close {}
+
+// First frame the bridge writes after starting.
+message Ready {
+  uint32 protocol_version = 1;
+  string bridge_version = 2;
+  // Version of @anthropic-ai/claude-agent-sdk the bridge was built with.
+  string sdk_version = 3;
+  // JS runtime version (Bun).
+  string runtime_version = 4;
+}
+
+// One SDKMessage exactly as the SDK yielded it, serialized with JSON.stringify.
+message SdkMessage {
+  string json = 1;
+}
+
+// Something went wrong but the bridge keeps running, e.g. a command it can't handle.
+// Errors that stop the bridge are reported on Exited instead.
+message Error {
+  string message = 1;
+}
+
+// The bridge's last frame before it exits. The daemon reads the process exit status from the
+// OS, and must also handle the bridge dying without sending this (crash or kill).
+message Exited {
+  // Why the bridge stopped; empty on a clean shutdown (Close or stdin EOF).
+  string error = 1;
+}

@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package blue.client.v1;
+
+import "blue/events/v1/events.proto";
+import "google/protobuf/timestamp.proto";
+
+// Server API for clients: the voice agent, the CLI, and later the web UI.
+// Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
+service ClientService {
+  rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  // Creates a session on a machine and starts its first turn.
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  // Sends a follow-up turn. Queued if a turn is already running.
+  rpc SendPrompt(SendPromptRequest) returns (SendPromptResponse);
+  rpc InterruptSession(InterruptSessionRequest) returns (InterruptSessionResponse);
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  // Streams events from `cursor` onward, then live events.
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+}
+
+enum TurnState {
+  TURN_STATE_UNSPECIFIED = 0;
+  TURN_STATE_QUEUED = 1;
+  TURN_STATE_RUNNING = 2;
+  TURN_STATE_COMPLETED = 3;
+  TURN_STATE_FAILED = 4;
+  TURN_STATE_INTERRUPTED = 5;
+}
+
+message Machine {
+  string id = 1;
+  string name = 2;
+  bool online = 3;
+  string os = 4;
+  google.protobuf.Timestamp last_seen_at = 5;
+}
+
+message Session {
+  string id = 1;
+  string machine_id = 2;
+  string machine_name = 3;
+  string title = 4;
+  blue.events.v1.SessionState state = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_activity_at = 7;
+  optional Turn current_turn = 8;
+}
+
+message Turn {
+  string id = 1;
+  // Zero-based position within the session: 0 is the instruction that created it, 1 the first
+  // follow-up, and so on. Orders turns, including queued ones that haven't started.
+  uint32 index = 2;
+  string instructions = 3;
+  TurnState state = 4;
+  string result_text = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp finished_at = 7;
+}
+
+message Event {
+  // Global, monotonically increasing; pass the last seen value to Subscribe to resume.
+  uint64 cursor = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  oneof kind {
+    SessionEventEnvelope session = 3;
+    MachineStatus machine_status = 4;
+  }
+}
+
+message SessionEventEnvelope {
+  string session_id = 1;
+  string turn_id = 2;
+  blue.events.v1.SessionEvent event = 3;
+}
+
+message MachineStatus {
+  string machine_id = 1;
+  string machine_name = 2;
+  bool online = 3;
+}
+
+// Returned in gRPC status details with FAILED_PRECONDITION when a machine name matches more
+// than one candidate.
+message AmbiguousTarget {
+  string query = 1;
+  repeated string candidates = 2;
+}
+
+message ListMachinesRequest {}
+
+message ListMachinesResponse {
+  repeated Machine machines = 1;
+}
+
+message ListSessionsRequest {
+  // Machine id or name; empty for all machines.
+  string machine = 1;
+  bool active_only = 2;
+}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+}
+
+message CreateSessionRequest {
+  // Machine id or name (case-insensitive).
+  string machine = 1;
+  // Which repo or directory to work in belongs here; Claude starts in the home directory.
+  string instructions = 2;
+  // Short name for the session, e.g. "Health endpoint". Required; an empty title is
+  // rejected with INVALID_ARGUMENT.
+  string title = 3;
+}
+
+message CreateSessionResponse {
+  Session session = 1;
+  string turn_id = 2;
+}
+
+message SendPromptRequest {
+  string session_id = 1;
+  string instructions = 2;
+}
+
+message SendPromptResponse {
+  string turn_id = 1;
+}
+
+message InterruptSessionRequest {
+  string session_id = 1;
+}
+
+message InterruptSessionResponse {}
+
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+message GetSessionResponse {
+  Session session = 1;
+  // Every event in the session, oldest first. Raw SDK messages are not included; use
+  // Subscribe with include_raw for those.
+  repeated Event events = 2;
+}
+
+message SubscribeRequest {
+  optional uint64 cursor = 1;
+  // Empty means all sessions.
+  repeated string session_ids = 2;
+  bool include_raw = 3;
+}
+
+message SubscribeResponse {
+  Event event = 1;
+}
