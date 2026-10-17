@@ -27,37 +27,24 @@ TURN_STATE_FAILED: TurnState
 TURN_STATE_INTERRUPTED: TurnState
 
 class Machine(_message.Message):
-    __slots__ = ("id", "name", "online", "os", "projects", "last_seen_at")
+    __slots__ = ("id", "name", "online", "os", "last_seen_at")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     ONLINE_FIELD_NUMBER: _ClassVar[int]
     OS_FIELD_NUMBER: _ClassVar[int]
-    PROJECTS_FIELD_NUMBER: _ClassVar[int]
     LAST_SEEN_AT_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     online: bool
     os: str
-    projects: _containers.RepeatedCompositeFieldContainer[Project]
     last_seen_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., online: _Optional[bool] = ..., os: _Optional[str] = ..., projects: _Optional[_Iterable[_Union[Project, _Mapping]]] = ..., last_seen_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
-
-class Project(_message.Message):
-    __slots__ = ("id", "name", "path")
-    ID_FIELD_NUMBER: _ClassVar[int]
-    NAME_FIELD_NUMBER: _ClassVar[int]
-    PATH_FIELD_NUMBER: _ClassVar[int]
-    id: str
-    name: str
-    path: str
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., path: _Optional[str] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., online: _Optional[bool] = ..., os: _Optional[str] = ..., last_seen_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Session(_message.Message):
-    __slots__ = ("id", "machine_id", "machine_name", "project_name", "title", "state", "created_at", "last_activity_at", "current_turn")
+    __slots__ = ("id", "machine_id", "machine_name", "title", "state", "created_at", "last_activity_at", "current_turn")
     ID_FIELD_NUMBER: _ClassVar[int]
     MACHINE_ID_FIELD_NUMBER: _ClassVar[int]
     MACHINE_NAME_FIELD_NUMBER: _ClassVar[int]
-    PROJECT_NAME_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
@@ -66,13 +53,12 @@ class Session(_message.Message):
     id: str
     machine_id: str
     machine_name: str
-    project_name: str
     title: str
     state: _events_pb2.SessionState
     created_at: _timestamp_pb2.Timestamp
     last_activity_at: _timestamp_pb2.Timestamp
     current_turn: Turn
-    def __init__(self, id: _Optional[str] = ..., machine_id: _Optional[str] = ..., machine_name: _Optional[str] = ..., project_name: _Optional[str] = ..., title: _Optional[str] = ..., state: _Optional[_Union[_events_pb2.SessionState, str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_activity_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., current_turn: _Optional[_Union[Turn, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., machine_id: _Optional[str] = ..., machine_name: _Optional[str] = ..., title: _Optional[str] = ..., state: _Optional[_Union[_events_pb2.SessionState, str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_activity_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., current_turn: _Optional[_Union[Turn, _Mapping]] = ...) -> None: ...
 
 class Turn(_message.Message):
     __slots__ = ("id", "ordinal", "instructions", "state", "result_text", "started_at", "finished_at")
@@ -157,16 +143,14 @@ class ListSessionsResponse(_message.Message):
     def __init__(self, sessions: _Optional[_Iterable[_Union[Session, _Mapping]]] = ...) -> None: ...
 
 class CreateSessionRequest(_message.Message):
-    __slots__ = ("machine", "project", "instructions", "title")
+    __slots__ = ("machine", "instructions", "title")
     MACHINE_FIELD_NUMBER: _ClassVar[int]
-    PROJECT_FIELD_NUMBER: _ClassVar[int]
     INSTRUCTIONS_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     machine: str
-    project: str
     instructions: str
     title: str
-    def __init__(self, machine: _Optional[str] = ..., project: _Optional[str] = ..., instructions: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
+    def __init__(self, machine: _Optional[str] = ..., instructions: _Optional[str] = ..., title: _Optional[str] = ...) -> None: ...
 
 class CreateSessionResponse(_message.Message):
     __slots__ = ("session", "turn_id")

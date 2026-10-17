@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file blue/bridge/v1/bridge.proto.
  */
 export const file_blue_bridge_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IsEBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEgsKA2N3ZBgCIAEoCRITCgtjbGF1ZGVfcGF0aBgDIAEoCRIlChhyZXN1bWVfY2xhdWRlX3Nlc3Npb25faWQYBCABKAlIAIgBARISCgVtb2RlbBgFIAEoCUgBiAEBEiAKGGluY2x1ZGVfcGFydGlhbF9tZXNzYWdlcxgGIAEoCEIbChlfcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkQggKBl9tb2RlbCInCgZQcm9tcHQSDwoHdHVybl9pZBgBIAEoCRIMCgR0ZXh0GAIgASgJIgsKCUludGVycnVwdCIHCgVDbG9zZSJnCgVSZWFkeRIYChBwcm90b2NvbF92ZXJzaW9uGAEgASgNEhYKDmJyaWRnZV92ZXJzaW9uGAIgASgJEhMKC3Nka192ZXJzaW9uGAMgASgJEhcKD3J1bnRpbWVfdmVyc2lvbhgEIAEoCSIaCgpTZGtNZXNzYWdlEgwKBGpzb24YASABKAkiJwoFRXJyb3ISDwoHbWVzc2FnZRgBIAEoCRINCgVmYXRhbBgCIAEoCCIWCgZFeGl0ZWQSDAoEY29kZRgBIAEoBWIGcHJvdG8z");
+  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IrQBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEhMKC2NsYXVkZV9wYXRoGAIgASgJEiUKGHJlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZBgDIAEoCUgAiAEBEhIKBW1vZGVsGAQgASgJSAGIAQESIAoYaW5jbHVkZV9wYXJ0aWFsX21lc3NhZ2VzGAUgASgIQhsKGV9yZXN1bWVfY2xhdWRlX3Nlc3Npb25faWRCCAoGX21vZGVsIicKBlByb21wdBIPCgd0dXJuX2lkGAEgASgJEgwKBHRleHQYAiABKAkiCwoJSW50ZXJydXB0IgcKBUNsb3NlImcKBVJlYWR5EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SFgoOYnJpZGdlX3ZlcnNpb24YAiABKAkSEwoLc2RrX3ZlcnNpb24YAyABKAkSFwoPcnVudGltZV92ZXJzaW9uGAQgASgJIhoKClNka01lc3NhZ2USDAoEanNvbhgBIAEoCSInCgVFcnJvchIPCgdtZXNzYWdlGAEgASgJEg0KBWZhdGFsGAIgASgIIhYKBkV4aXRlZBIMCgRjb2RlGAEgASgFYgZwcm90bzM");
 
 /**
  * Daemon -> bridge.
@@ -100,6 +100,7 @@ export const BridgeOutputSchema: GenMessage<BridgeOutput> = /*@__PURE__*/
 
 /**
  * Starts the Agent SDK query. Must be the first command, sent once.
+ * Claude always starts in the user's home directory and may work anywhere on the machine.
  *
  * @generated from message blue.bridge.v1.Start
  */
@@ -110,33 +111,26 @@ export type Start = Message<"blue.bridge.v1.Start"> & {
   sessionId: string;
 
   /**
-   * Working directory for Claude (a project path from the daemon's allowlist).
-   *
-   * @generated from field: string cwd = 2;
-   */
-  cwd: string;
-
-  /**
    * Path to the installed `claude` executable, passed as pathToClaudeCodeExecutable.
    *
-   * @generated from field: string claude_path = 3;
+   * @generated from field: string claude_path = 2;
    */
   claudePath: string;
 
   /**
    * Claude session id to resume, if continuing an existing conversation.
    *
-   * @generated from field: optional string resume_claude_session_id = 4;
+   * @generated from field: optional string resume_claude_session_id = 3;
    */
   resumeClaudeSessionId?: string | undefined;
 
   /**
-   * @generated from field: optional string model = 5;
+   * @generated from field: optional string model = 4;
    */
   model?: string | undefined;
 
   /**
-   * @generated from field: bool include_partial_messages = 6;
+   * @generated from field: bool include_partial_messages = 5;
    */
   includePartialMessages: boolean;
 };

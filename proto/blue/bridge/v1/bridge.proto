@@ -29,16 +29,15 @@ message BridgeOutput {
 }
 
 // Starts the Agent SDK query. Must be the first command, sent once.
+// Claude always starts in the user's home directory and may work anywhere on the machine.
 message Start {
   string session_id = 1;
-  // Working directory for Claude (a project path from the daemon's allowlist).
-  string cwd = 2;
   // Path to the installed `claude` executable, passed as pathToClaudeCodeExecutable.
-  string claude_path = 3;
+  string claude_path = 2;
   // Claude session id to resume, if continuing an existing conversation.
-  optional string resume_claude_session_id = 4;
-  optional string model = 5;
-  bool include_partial_messages = 6;
+  optional string resume_claude_session_id = 3;
+  optional string model = 4;
+  bool include_partial_messages = 5;
 }
 
 // Sends one user turn into the running query.

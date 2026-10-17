@@ -34,26 +34,18 @@ message Machine {
   string name = 2;
   bool online = 3;
   string os = 4;
-  repeated Project projects = 5;
-  google.protobuf.Timestamp last_seen_at = 6;
-}
-
-message Project {
-  string id = 1;
-  string name = 2;
-  string path = 3;
+  google.protobuf.Timestamp last_seen_at = 5;
 }
 
 message Session {
   string id = 1;
   string machine_id = 2;
   string machine_name = 3;
-  string project_name = 4;
-  string title = 5;
-  blue.events.v1.SessionState state = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp last_activity_at = 8;
-  optional Turn current_turn = 9;
+  string title = 4;
+  blue.events.v1.SessionState state = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_activity_at = 7;
+  optional Turn current_turn = 8;
 }
 
 message Turn {
@@ -88,8 +80,8 @@ message MachineStatus {
   bool online = 3;
 }
 
-// Returned in gRPC status details with FAILED_PRECONDITION when a machine or project name
-// matches more than one candidate.
+// Returned in gRPC status details with FAILED_PRECONDITION when a machine name matches more
+// than one candidate.
 message AmbiguousTarget {
   string query = 1;
   repeated string candidates = 2;
@@ -114,10 +106,9 @@ message ListSessionsResponse {
 message CreateSessionRequest {
   // Machine id or name (case-insensitive).
   string machine = 1;
-  // Project name on that machine (case-insensitive).
-  string project = 2;
-  string instructions = 3;
-  optional string title = 4;
+  // Which repo or directory to work in belongs here; Claude starts in the home directory.
+  string instructions = 2;
+  optional string title = 3;
 }
 
 message CreateSessionResponse {

@@ -90,7 +90,7 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
   ┌────────────┴───────────── each machine ─────────────────┐
   │ blue-daemon (Rust)                                       │
   │  server connection · session supervisor · SDK→event      │
-  │  translation · SQLite outbox · project allowlist         │
+  │  translation · SQLite outbox                             │
   │       │ stdin/stdout length-delimited protobuf           │
   │       │ (one child per session)                          │
   │       ▼                                                  │
@@ -104,7 +104,8 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
 ### A voice turn, end to end
 
 1. I say "in the blue repo on my desktop, add a health endpoint."
-2. Voice LLM calls `start_task(machine="desktop", project="blue", instructions=…)`.
+2. Voice LLM calls `start_task(machine="desktop", instructions="in the blue repo, add a health
+   endpoint")`.
 3. Voice sends `session.create` to the server; server persists session + turn, routes
    `session.start` to the desktop daemon; voice immediately says "On it."
 4. Daemon spawns a bridge, sends `start` + `prompt`. Bridge calls `query()`.
@@ -205,7 +206,7 @@ the standard "size-delimited" format (`prost::Message::encode_length_delimited` 
 `sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`).
 
 - Daemon → bridge: `BridgeInput { oneof command { Start, Prompt, Interrupt, Close } }`
-  - `Start { session_id, cwd, claude_path, resume_claude_session_id?, model?, include_partial_messages }`
+  - `Start { session_id, claude_path, resume_claude_session_id?, model?, include_partial_messages }`
   - `Prompt { turn_id, text }`
   - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
 - Bridge → daemon: `BridgeOutput { oneof event { Ready, SdkMessage, Error, Exited } }`
@@ -215,10 +216,15 @@ the standard "size-delimited" format (`prost::Message::encode_length_delimited` 
     with SDK releases, so the bridge doesn't reinterpret them; the daemon parses what it needs.
   - `Error { message, fatal }`, `Exited { code }`
 
-Bridge behavior: `query({ prompt: asyncIterableOfUserMessages, options: { cwd, resume,
+Bridge behavior: `query({ prompt: asyncIterableOfUserMessages, options: { cwd: os.homedir(), resume,
 permissionMode: "bypassPermissions", pathToClaudeCodeExecutable: claudePath, model,
 includePartialMessages } })`. `Interrupt` → `q.interrupt()`. `Close` or stdin EOF ends the
 input iterable so the query finishes cleanly.
+
+**Working directory.** Claude always starts in the user's home directory and can work anywhere
+the OS user can. There is no project list; the instructions say which repo or directory to work
+in ("in the blue repo, …"). A fixed starting directory also keeps `resume` simple, since Claude
+Code files its session transcripts under the directory a session started in.
 
 Daemon-side process control: the bridge (and the `claude` it spawns) run in a Windows Job
 Object / Unix process group so a hard kill takes down the whole tree.
@@ -239,7 +245,7 @@ Daemon → server (`AttachRequest.oneof message`):
 
 | Message | Fields | Notes |
 |---|---|---|
-| `Hello` | `protocol_version, versions{daemon, bridge, sdk, claude}, os, arch, projects[{name, path}], sessions[{session_id, claude_session_id, state, last_seq}]` | must be first |
+| `Hello` | `protocol_version, versions{daemon, bridge, sdk, claude}, os, arch, sessions[{session_id, claude_session_id, state, last_seq}]` | must be first |
 | `DaemonEvent` | `session_id, seq, turn_id, occurred_at, blue.events.v1.SessionEvent event` | `seq` per-session, monotonic, outbox-backed |
 | `CommandResult` | `command_id, ok, error_code, error_message` | reply to a server `Command` |
 
@@ -251,7 +257,7 @@ Server → daemon (`AttachResponse.oneof message`):
 | `Command` | `command_id` + `oneof { StartSession, SendPrompt, InterruptSession, CloseSession }` |
 | `EventsAck` | `session_id, up_to_seq` — daemon deletes outbox rows ≤ seq |
 
-- `StartSession { session_id, project_name, resume_claude_session_id?, model? }`
+- `StartSession { session_id, resume_claude_session_id?, model? }`
 - `SendPrompt { session_id, turn_id, text }`
 - `InterruptSession { session_id }`, `CloseSession { session_id }`
 
@@ -271,9 +277,9 @@ Auth: `authorization: Bearer <token>` — the voice service token or a user sess
 
 | RPC | Request → Response |
 |---|---|
-| `ListMachines` | — → machines with online status + projects |
+| `ListMachines` | — → machines with online status |
 | `ListSessions` | `machine?, active_only` → sessions |
-| `CreateSession` | `machine, project, instructions, title?` → `session, turn_id` |
+| `CreateSession` | `machine, instructions, title?` → `session, turn_id` |
 | `SendPrompt` | `session_id, instructions` → `turn_id` (queued if a turn is running) |
 | `InterruptSession` | `session_id` → — |
 | `GetSession` | `session_id, recent_events` → session + recent events |
@@ -282,7 +288,7 @@ Auth: `authorization: Bearer <token>` — the voice service token or a user sess
 `Event { cursor, occurred_at, oneof kind { SessionEventEnvelope session, MachineStatus machine_status } }`.
 `cursor` is the global `events.id`; a reconnecting subscriber passes its last cursor to resume.
 
-`machine` and `project` accept ids or names; the server resolves names case-insensitively. Errors
+`machine` accepts an id or name; the server resolves names case-insensitively. Errors
 use gRPC status codes: `NOT_FOUND`, and `FAILED_PRECONDITION` for ambiguity, with an
 `AmbiguousTarget { candidates[] }` message in the status details so the voice agent can ask.
 
@@ -398,8 +404,7 @@ user_sessions  (id, user_id FK, token_hash UNIQUE, client_name, created_at,
 machines       (id, name UNIQUE, token_hash, os, arch, daemon_version, bridge_version,
                 sdk_version, claude_version, created_at, last_seen_at, revoked_at)
 pairing_codes  (code_hash PK, created_by, expires_at, claimed_at, machine_id)
-projects       (id, machine_id FK, name, path, last_reported_at, UNIQUE(machine_id, name))
-sessions       (id, machine_id FK, project_id FK, title, state, claude_session_id,
+sessions       (id, machine_id FK, title, state, claude_session_id,
                 created_at, updated_at, last_activity_at)
 turns          (id, session_id FK, ordinal, instructions, state  -- queued|running|completed|failed|interrupted
                 , result_text, cost_usd, duration_ms, error, created_at, started_at, finished_at)
@@ -421,9 +426,7 @@ task; translated events are kept.
 - `blue-daemon service install|uninstall|status` — via the `service-manager` crate
   (Windows service / launchd / systemd user unit).
 - `blue-daemon doctor` — checks: config valid, `claude` found + version, bridge starts and
-  reports a matching protocol version, server reachable and token accepted, each project path
-  exists.
-- `blue-daemon projects add <name> <path>` / `list` / `remove`.
+  reports a matching protocol version, server reachable and token accepted.
 
 **Config:** `daemon.toml` in the OS config dir (`%APPDATA%\blue\` on Windows,
 `~/.config/blue/` elsewhere):
@@ -435,10 +438,6 @@ claude_path = "C:/Users/Jason/.local/bin/claude.exe"   # auto-detected if omitte
 bridge_path = ""                                        # default: next to blue-daemon
 max_concurrent_sessions = 4
 forward_raw = true
-
-[[projects]]
-name = "blue"
-path = "C:/Users/Jason/documents/code/blue"
 ```
 
 Machine token is stored in the OS keyring (`keyring` crate), falling back to a file with
@@ -453,10 +452,8 @@ restricted permissions.
 - `bridge_proc` — spawn in a Job Object / process group, size-delimited protobuf IO, kill-tree on drop.
 - `translate` — raw `SDKMessage` → events (§5.5); pure function, fixture-tested.
 - `outbox` — SQLite (`sqlx` sqlite): `(session_id, seq, payload)`; append before send,
-  delete on `events.ack`. Also stores `sessions(session_id, claude_session_id, project)` so a
+  delete on `events.ack`. Also stores `sessions(session_id, claude_session_id)` so a
   restarted daemon can resume.
-- Project allowlist: `session.start` for a project not in config → rejected. Permissions are
-  otherwise wide open (`bypassPermissions`), so this is the one local guardrail.
 - Recovery: bridge exits unexpectedly mid-turn → emit `turn.failed`; next prompt to that
   session respawns a bridge with `resume: claudeSessionId`.
 - Idle bridges are closed after a timeout (default 30 min) and transparently resumed on the
@@ -493,9 +490,9 @@ auto-reconnects and resumes from its last cursor), a "focused session" id, and a
 
 | Tool | Does |
 |---|---|
-| `list_machines()` | machines, online status, projects |
-| `list_sessions(active_only=True)` | sessions with machine, project, state |
-| `start_task(machine, project, instructions)` | `CreateSession`; focuses the new session |
+| `list_machines()` | machines and online status |
+| `list_sessions(active_only=True)` | sessions with machine, title, state |
+| `start_task(machine, instructions)` | `CreateSession`; focuses the new session |
 | `send_follow_up(instructions, session=None)` | `SendPrompt` to focused or named session |
 | `get_status(session=None)` | `GetSession` with recent events; LLM summarizes |
 | `interrupt(session=None)` | `InterruptSession` |
@@ -507,7 +504,8 @@ auto-reconnects and resumes from its last cursor), a "focused session" id, and a
   write code yourself; you dispatch.
 - Pass the user's request to Claude close to verbatim — clean up disfluencies, resolve "it"/
   "that" from context, don't reinterpret.
-- Confirm machine/project only when ambiguous (server returns candidates).
+- Confirm the machine only when ambiguous (server returns candidates). If the user doesn't say
+  which repo or directory to work in and context doesn't make it clear, ask before dispatching.
 - Acknowledge dispatch in a few words. Never read code, diffs, or paths character by character.
 - Stay silent during progress unless asked.
 
@@ -524,7 +522,7 @@ Text client over the same gRPC services (`ClientService` + `AuthService`):
 - `blue login` (GitHub device flow; prints the code and opens github.com/login/device),
   `blue logout`, `blue whoami`; the session token is kept in the OS keyring
 - `blue pair-code`, `blue machines [revoke <name>]`
-- `blue run <machine> <project> "<instructions>"` — create session, stream events to terminal
+- `blue run <machine> "<instructions>"` — create session, stream events to terminal
 - `blue send <session> "<instructions>"`, `blue interrupt <session>`, `blue sessions`,
   `blue tail [--session]`
 - `blue token` — print a LiveKit room token (handy with Agents Playground)
@@ -569,7 +567,8 @@ Permissions are wide open on the machines, so **server auth is the security boun
 - Rate limiting on `AuthService.LoginWithGitHub` and `AuthService.ClaimPairingCode`.
 - TLS everywhere via cert-manager on ingress; daemons refuse plaintext servers except
   `localhost`.
-- Daemon-side project allowlist: Claude only ever starts in configured project directories.
+- No directory restrictions on the machines: Claude starts in the home directory and can work
+  anywhere the OS user can.
 - Audit log of logins, pairings, revocations, session creates.
 
 ---
@@ -773,7 +772,7 @@ Technology decided then.
 | `bun build --compile` incompatibility with the SDK | Verify in phase 1; fallback: ship bridge as bundled JS + require Node, or Node SEA |
 | Orphaned `claude` processes on Windows | Job Objects with kill-on-close; tested in phase 1 |
 | Long-lived gRPC streams dropped by ingress/LB | HTTP/2 keepalive every 20 s; reconnect + outbox replay; documented ingress timeouts |
-| Allow-all permissions + remote voice | Strong server auth; per-machine tokens; project allowlist; audit log |
+| Allow-all permissions, work anywhere, remote voice | Strong server auth; per-machine tokens; audit log |
 | Voice talks over me / interrupts at bad times | Notifications only when both sides are quiet; coalescing; LiveKit turn detection |
 | Hosted Postgres disallows `CREATE DATABASE` | Manual `bootstrap.sql` path with bootstrap disabled |
 | `claude` not logged in on a machine | `blue-daemon doctor` checks; surfaced as `turn.failed` with a clear reason |

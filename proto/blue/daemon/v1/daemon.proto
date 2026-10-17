@@ -35,9 +35,8 @@ message Hello {
   Versions versions = 2;
   string os = 3;
   string arch = 4;
-  repeated Project projects = 5;
   // Sessions this daemon currently knows about, for reconciliation after a reconnect.
-  repeated SessionSnapshot sessions = 6;
+  repeated SessionSnapshot sessions = 5;
 }
 
 message Versions {
@@ -45,12 +44,6 @@ message Versions {
   string bridge = 2;
   string sdk = 3;
   string claude = 4;
-}
-
-// A directory the daemon allows Claude to work in.
-message Project {
-  string name = 1;
-  string path = 2;
 }
 
 message SessionSnapshot {
@@ -98,9 +91,8 @@ message Command {
 
 message StartSession {
   string session_id = 1;
-  string project_name = 2;
-  optional string resume_claude_session_id = 3;
-  optional string model = 4;
+  optional string resume_claude_session_id = 2;
+  optional string model = 3;
 }
 
 message SendPrompt {

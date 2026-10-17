@@ -26,59 +26,57 @@ from blue.events.v1 import events_pb2 as blue_dot_events_dot_v1_dot_events__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x62lue/client/v1/client.proto\x12\x0e\x62lue.client.v1\x1a\x1b\x62lue/events/v1/events.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\x01\n\x07Machine\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0e\n\x06online\x18\x03 \x01(\x08\x12\n\n\x02os\x18\x04 \x01(\t\x12)\n\x08projects\x18\x05 \x03(\x0b\x32\x17.blue.client.v1.Project\x12\x30\n\x0clast_seen_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"1\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"\xb9\x02\n\x07Session\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\nmachine_id\x18\x02 \x01(\t\x12\x14\n\x0cmachine_name\x18\x03 \x01(\t\x12\x14\n\x0cproject_name\x18\x04 \x01(\t\x12\r\n\x05title\x18\x05 \x01(\t\x12+\n\x05state\x18\x06 \x01(\x0e\x32\x1c.blue.events.v1.SessionState\x12.\n\ncreated_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x10last_activity_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0c\x63urrent_turn\x18\t \x01(\x0b\x32\x14.blue.client.v1.TurnH\x00\x88\x01\x01\x42\x0f\n\r_current_turn\"\xd9\x01\n\x04Turn\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07ordinal\x18\x02 \x01(\r\x12\x14\n\x0cinstructions\x18\x03 \x01(\t\x12(\n\x05state\x18\x04 \x01(\x0e\x32\x19.blue.client.v1.TurnState\x12\x13\n\x0bresult_text\x18\x05 \x01(\t\x12.\n\nstarted_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0b\x66inished_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xc2\x01\n\x05\x45vent\x12\x0e\n\x06\x63ursor\x18\x01 \x01(\x04\x12/\n\x0boccurred_at\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x37\n\x07session\x18\x03 \x01(\x0b\x32$.blue.client.v1.SessionEventEnvelopeH\x00\x12\x37\n\x0emachine_status\x18\x04 \x01(\x0b\x32\x1d.blue.client.v1.MachineStatusH\x00\x42\x06\n\x04kind\"h\n\x14SessionEventEnvelope\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07turn_id\x18\x02 \x01(\t\x12+\n\x05\x65vent\x18\x03 \x01(\x0b\x32\x1c.blue.events.v1.SessionEvent\"I\n\rMachineStatus\x12\x12\n\nmachine_id\x18\x01 \x01(\t\x12\x14\n\x0cmachine_name\x18\x02 \x01(\t\x12\x0e\n\x06online\x18\x03 \x01(\x08\"4\n\x0f\x41mbiguousTarget\x12\r\n\x05query\x18\x01 \x01(\t\x12\x12\n\ncandidates\x18\x02 \x03(\t\"\x15\n\x13ListMachinesRequest\"A\n\x14ListMachinesResponse\x12)\n\x08machines\x18\x01 \x03(\x0b\x32\x17.blue.client.v1.Machine\";\n\x13ListSessionsRequest\x12\x0f\n\x07machine\x18\x01 \x01(\t\x12\x13\n\x0b\x61\x63tive_only\x18\x02 \x01(\x08\"A\n\x14ListSessionsResponse\x12)\n\x08sessions\x18\x01 \x03(\x0b\x32\x17.blue.client.v1.Session\"l\n\x14\x43reateSessionRequest\x12\x0f\n\x07machine\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x14\n\x0cinstructions\x18\x03 \x01(\t\x12\x12\n\x05title\x18\x04 \x01(\tH\x00\x88\x01\x01\x42\x08\n\x06_title\"R\n\x15\x43reateSessionResponse\x12(\n\x07session\x18\x01 \x01(\x0b\x32\x17.blue.client.v1.Session\x12\x0f\n\x07turn_id\x18\x02 \x01(\t\"=\n\x11SendPromptRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x14\n\x0cinstructions\x18\x02 \x01(\t\"%\n\x12SendPromptResponse\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\"-\n\x17InterruptSessionRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\"\x1a\n\x18InterruptSessionResponse\">\n\x11GetSessionRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x15\n\rrecent_events\x18\x02 \x01(\r\"l\n\x12GetSessionResponse\x12(\n\x07session\x18\x01 \x01(\x0b\x32\x17.blue.client.v1.Session\x12,\n\rrecent_events\x18\x02 \x03(\x0b\x32\x15.blue.client.v1.Event\"\\\n\x10SubscribeRequest\x12\x13\n\x06\x63ursor\x18\x01 \x01(\x04H\x00\x88\x01\x01\x12\x13\n\x0bsession_ids\x18\x02 \x03(\t\x12\x13\n\x0binclude_raw\x18\x03 \x01(\x08\x42\t\n\x07_cursor\"9\n\x11SubscribeResponse\x12$\n\x05\x65vent\x18\x01 \x01(\x0b\x32\x15.blue.client.v1.Event*\xa3\x01\n\tTurnState\x12\x1a\n\x16TURN_STATE_UNSPECIFIED\x10\x00\x12\x15\n\x11TURN_STATE_QUEUED\x10\x01\x12\x16\n\x12TURN_STATE_RUNNING\x10\x02\x12\x18\n\x14TURN_STATE_COMPLETED\x10\x03\x12\x15\n\x11TURN_STATE_FAILED\x10\x04\x12\x1a\n\x16TURN_STATE_INTERRUPTED\x10\x05\x32\x88\x05\n\rClientService\x12Y\n\x0cListMachines\x12#.blue.client.v1.ListMachinesRequest\x1a$.blue.client.v1.ListMachinesResponse\x12Y\n\x0cListSessions\x12#.blue.client.v1.ListSessionsRequest\x1a$.blue.client.v1.ListSessionsResponse\x12\\\n\rCreateSession\x12$.blue.client.v1.CreateSessionRequest\x1a%.blue.client.v1.CreateSessionResponse\x12S\n\nSendPrompt\x12!.blue.client.v1.SendPromptRequest\x1a\".blue.client.v1.SendPromptResponse\x12\x65\n\x10InterruptSession\x12\'.blue.client.v1.InterruptSessionRequest\x1a(.blue.client.v1.InterruptSessionResponse\x12S\n\nGetSession\x12!.blue.client.v1.GetSessionRequest\x1a\".blue.client.v1.GetSessionResponse\x12R\n\tSubscribe\x12 .blue.client.v1.SubscribeRequest\x1a!.blue.client.v1.SubscribeResponse0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x62lue/client/v1/client.proto\x12\x0e\x62lue.client.v1\x1a\x1b\x62lue/events/v1/events.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"q\n\x07Machine\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0e\n\x06online\x18\x03 \x01(\x08\x12\n\n\x02os\x18\x04 \x01(\t\x12\x30\n\x0clast_seen_at\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xa3\x02\n\x07Session\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\nmachine_id\x18\x02 \x01(\t\x12\x14\n\x0cmachine_name\x18\x03 \x01(\t\x12\r\n\x05title\x18\x04 \x01(\t\x12+\n\x05state\x18\x05 \x01(\x0e\x32\x1c.blue.events.v1.SessionState\x12.\n\ncreated_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x10last_activity_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0c\x63urrent_turn\x18\x08 \x01(\x0b\x32\x14.blue.client.v1.TurnH\x00\x88\x01\x01\x42\x0f\n\r_current_turn\"\xd9\x01\n\x04Turn\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07ordinal\x18\x02 \x01(\r\x12\x14\n\x0cinstructions\x18\x03 \x01(\t\x12(\n\x05state\x18\x04 \x01(\x0e\x32\x19.blue.client.v1.TurnState\x12\x13\n\x0bresult_text\x18\x05 \x01(\t\x12.\n\nstarted_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0b\x66inished_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xc2\x01\n\x05\x45vent\x12\x0e\n\x06\x63ursor\x18\x01 \x01(\x04\x12/\n\x0boccurred_at\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x37\n\x07session\x18\x03 \x01(\x0b\x32$.blue.client.v1.SessionEventEnvelopeH\x00\x12\x37\n\x0emachine_status\x18\x04 \x01(\x0b\x32\x1d.blue.client.v1.MachineStatusH\x00\x42\x06\n\x04kind\"h\n\x14SessionEventEnvelope\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07turn_id\x18\x02 \x01(\t\x12+\n\x05\x65vent\x18\x03 \x01(\x0b\x32\x1c.blue.events.v1.SessionEvent\"I\n\rMachineStatus\x12\x12\n\nmachine_id\x18\x01 \x01(\t\x12\x14\n\x0cmachine_name\x18\x02 \x01(\t\x12\x0e\n\x06online\x18\x03 \x01(\x08\"4\n\x0f\x41mbiguousTarget\x12\r\n\x05query\x18\x01 \x01(\t\x12\x12\n\ncandidates\x18\x02 \x03(\t\"\x15\n\x13ListMachinesRequest\"A\n\x14ListMachinesResponse\x12)\n\x08machines\x18\x01 \x03(\x0b\x32\x17.blue.client.v1.Machine\";\n\x13ListSessionsRequest\x12\x0f\n\x07machine\x18\x01 \x01(\t\x12\x13\n\x0b\x61\x63tive_only\x18\x02 \x01(\x08\"A\n\x14ListSessionsResponse\x12)\n\x08sessions\x18\x01 \x03(\x0b\x32\x17.blue.client.v1.Session\"[\n\x14\x43reateSessionRequest\x12\x0f\n\x07machine\x18\x01 \x01(\t\x12\x14\n\x0cinstructions\x18\x02 \x01(\t\x12\x12\n\x05title\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x08\n\x06_title\"R\n\x15\x43reateSessionResponse\x12(\n\x07session\x18\x01 \x01(\x0b\x32\x17.blue.client.v1.Session\x12\x0f\n\x07turn_id\x18\x02 \x01(\t\"=\n\x11SendPromptRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x14\n\x0cinstructions\x18\x02 \x01(\t\"%\n\x12SendPromptResponse\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\"-\n\x17InterruptSessionRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\"\x1a\n\x18InterruptSessionResponse\">\n\x11GetSessionRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x15\n\rrecent_events\x18\x02 \x01(\r\"l\n\x12GetSessionResponse\x12(\n\x07session\x18\x01 \x01(\x0b\x32\x17.blue.client.v1.Session\x12,\n\rrecent_events\x18\x02 \x03(\x0b\x32\x15.blue.client.v1.Event\"\\\n\x10SubscribeRequest\x12\x13\n\x06\x63ursor\x18\x01 \x01(\x04H\x00\x88\x01\x01\x12\x13\n\x0bsession_ids\x18\x02 \x03(\t\x12\x13\n\x0binclude_raw\x18\x03 \x01(\x08\x42\t\n\x07_cursor\"9\n\x11SubscribeResponse\x12$\n\x05\x65vent\x18\x01 \x01(\x0b\x32\x15.blue.client.v1.Event*\xa3\x01\n\tTurnState\x12\x1a\n\x16TURN_STATE_UNSPECIFIED\x10\x00\x12\x15\n\x11TURN_STATE_QUEUED\x10\x01\x12\x16\n\x12TURN_STATE_RUNNING\x10\x02\x12\x18\n\x14TURN_STATE_COMPLETED\x10\x03\x12\x15\n\x11TURN_STATE_FAILED\x10\x04\x12\x1a\n\x16TURN_STATE_INTERRUPTED\x10\x05\x32\x88\x05\n\rClientService\x12Y\n\x0cListMachines\x12#.blue.client.v1.ListMachinesRequest\x1a$.blue.client.v1.ListMachinesResponse\x12Y\n\x0cListSessions\x12#.blue.client.v1.ListSessionsRequest\x1a$.blue.client.v1.ListSessionsResponse\x12\\\n\rCreateSession\x12$.blue.client.v1.CreateSessionRequest\x1a%.blue.client.v1.CreateSessionResponse\x12S\n\nSendPrompt\x12!.blue.client.v1.SendPromptRequest\x1a\".blue.client.v1.SendPromptResponse\x12\x65\n\x10InterruptSession\x12\'.blue.client.v1.InterruptSessionRequest\x1a(.blue.client.v1.InterruptSessionResponse\x12S\n\nGetSession\x12!.blue.client.v1.GetSessionRequest\x1a\".blue.client.v1.GetSessionResponse\x12R\n\tSubscribe\x12 .blue.client.v1.SubscribeRequest\x1a!.blue.client.v1.SubscribeResponse0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'blue.client.v1.client_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_TURNSTATE']._serialized_start=2204
-  _globals['_TURNSTATE']._serialized_end=2367
-  _globals['_MACHINE']._serialized_start=110
-  _globals['_MACHINE']._serialized_end=266
-  _globals['_PROJECT']._serialized_start=268
-  _globals['_PROJECT']._serialized_end=317
-  _globals['_SESSION']._serialized_start=320
-  _globals['_SESSION']._serialized_end=633
-  _globals['_TURN']._serialized_start=636
-  _globals['_TURN']._serialized_end=853
-  _globals['_EVENT']._serialized_start=856
-  _globals['_EVENT']._serialized_end=1050
-  _globals['_SESSIONEVENTENVELOPE']._serialized_start=1052
-  _globals['_SESSIONEVENTENVELOPE']._serialized_end=1156
-  _globals['_MACHINESTATUS']._serialized_start=1158
-  _globals['_MACHINESTATUS']._serialized_end=1231
-  _globals['_AMBIGUOUSTARGET']._serialized_start=1233
-  _globals['_AMBIGUOUSTARGET']._serialized_end=1285
-  _globals['_LISTMACHINESREQUEST']._serialized_start=1287
-  _globals['_LISTMACHINESREQUEST']._serialized_end=1308
-  _globals['_LISTMACHINESRESPONSE']._serialized_start=1310
-  _globals['_LISTMACHINESRESPONSE']._serialized_end=1375
-  _globals['_LISTSESSIONSREQUEST']._serialized_start=1377
-  _globals['_LISTSESSIONSREQUEST']._serialized_end=1436
-  _globals['_LISTSESSIONSRESPONSE']._serialized_start=1438
-  _globals['_LISTSESSIONSRESPONSE']._serialized_end=1503
-  _globals['_CREATESESSIONREQUEST']._serialized_start=1505
-  _globals['_CREATESESSIONREQUEST']._serialized_end=1613
-  _globals['_CREATESESSIONRESPONSE']._serialized_start=1615
-  _globals['_CREATESESSIONRESPONSE']._serialized_end=1697
-  _globals['_SENDPROMPTREQUEST']._serialized_start=1699
-  _globals['_SENDPROMPTREQUEST']._serialized_end=1760
-  _globals['_SENDPROMPTRESPONSE']._serialized_start=1762
-  _globals['_SENDPROMPTRESPONSE']._serialized_end=1799
-  _globals['_INTERRUPTSESSIONREQUEST']._serialized_start=1801
-  _globals['_INTERRUPTSESSIONREQUEST']._serialized_end=1846
-  _globals['_INTERRUPTSESSIONRESPONSE']._serialized_start=1848
-  _globals['_INTERRUPTSESSIONRESPONSE']._serialized_end=1874
-  _globals['_GETSESSIONREQUEST']._serialized_start=1876
-  _globals['_GETSESSIONREQUEST']._serialized_end=1938
-  _globals['_GETSESSIONRESPONSE']._serialized_start=1940
-  _globals['_GETSESSIONRESPONSE']._serialized_end=2048
-  _globals['_SUBSCRIBEREQUEST']._serialized_start=2050
-  _globals['_SUBSCRIBEREQUEST']._serialized_end=2142
-  _globals['_SUBSCRIBERESPONSE']._serialized_start=2144
-  _globals['_SUBSCRIBERESPONSE']._serialized_end=2201
-  _globals['_CLIENTSERVICE']._serialized_start=2370
-  _globals['_CLIENTSERVICE']._serialized_end=3018
+  _globals['_TURNSTATE']._serialized_start=2070
+  _globals['_TURNSTATE']._serialized_end=2233
+  _globals['_MACHINE']._serialized_start=109
+  _globals['_MACHINE']._serialized_end=222
+  _globals['_SESSION']._serialized_start=225
+  _globals['_SESSION']._serialized_end=516
+  _globals['_TURN']._serialized_start=519
+  _globals['_TURN']._serialized_end=736
+  _globals['_EVENT']._serialized_start=739
+  _globals['_EVENT']._serialized_end=933
+  _globals['_SESSIONEVENTENVELOPE']._serialized_start=935
+  _globals['_SESSIONEVENTENVELOPE']._serialized_end=1039
+  _globals['_MACHINESTATUS']._serialized_start=1041
+  _globals['_MACHINESTATUS']._serialized_end=1114
+  _globals['_AMBIGUOUSTARGET']._serialized_start=1116
+  _globals['_AMBIGUOUSTARGET']._serialized_end=1168
+  _globals['_LISTMACHINESREQUEST']._serialized_start=1170
+  _globals['_LISTMACHINESREQUEST']._serialized_end=1191
+  _globals['_LISTMACHINESRESPONSE']._serialized_start=1193
+  _globals['_LISTMACHINESRESPONSE']._serialized_end=1258
+  _globals['_LISTSESSIONSREQUEST']._serialized_start=1260
+  _globals['_LISTSESSIONSREQUEST']._serialized_end=1319
+  _globals['_LISTSESSIONSRESPONSE']._serialized_start=1321
+  _globals['_LISTSESSIONSRESPONSE']._serialized_end=1386
+  _globals['_CREATESESSIONREQUEST']._serialized_start=1388
+  _globals['_CREATESESSIONREQUEST']._serialized_end=1479
+  _globals['_CREATESESSIONRESPONSE']._serialized_start=1481
+  _globals['_CREATESESSIONRESPONSE']._serialized_end=1563
+  _globals['_SENDPROMPTREQUEST']._serialized_start=1565
+  _globals['_SENDPROMPTREQUEST']._serialized_end=1626
+  _globals['_SENDPROMPTRESPONSE']._serialized_start=1628
+  _globals['_SENDPROMPTRESPONSE']._serialized_end=1665
+  _globals['_INTERRUPTSESSIONREQUEST']._serialized_start=1667
+  _globals['_INTERRUPTSESSIONREQUEST']._serialized_end=1712
+  _globals['_INTERRUPTSESSIONRESPONSE']._serialized_start=1714
+  _globals['_INTERRUPTSESSIONRESPONSE']._serialized_end=1740
+  _globals['_GETSESSIONREQUEST']._serialized_start=1742
+  _globals['_GETSESSIONREQUEST']._serialized_end=1804
+  _globals['_GETSESSIONRESPONSE']._serialized_start=1806
+  _globals['_GETSESSIONRESPONSE']._serialized_end=1914
+  _globals['_SUBSCRIBEREQUEST']._serialized_start=1916
+  _globals['_SUBSCRIBEREQUEST']._serialized_end=2008
+  _globals['_SUBSCRIBERESPONSE']._serialized_start=2010
+  _globals['_SUBSCRIBERESPONSE']._serialized_end=2067
+  _globals['_CLIENTSERVICE']._serialized_start=2236
+  _globals['_CLIENTSERVICE']._serialized_end=2884
 # @@protoc_insertion_point(module_scope)
