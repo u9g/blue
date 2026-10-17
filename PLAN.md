@@ -270,8 +270,8 @@ message types are logged and forwarded raw, never fatal.
 
 ### 5.1 Server (`crates/server`, bin `blue-server`)
 
-**Stack:** tokio, tonic (gRPC; `tonic-health` for probes, `tonic-web` later for the browser), sqlx (Postgres, compile-time-checked queries, embedded
-migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/user`), `tracing`,
+**Stack:** tokio, tonic (gRPC; `tonic-health` for probes, `tonic-web` later for the browser), sqlx (Postgres, runtime-checked queries covered by
+the integration tests, embedded migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/user`), `tracing`,
 `clap`.
 
 **Subcommands** (one image, three roles):
@@ -279,6 +279,8 @@ migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/us
 - `blue-server serve` — the server.
 - `blue-server db bootstrap` — uses the admin DSN to create role + database (§6).
 - `blue-server db migrate` — runs embedded migrations as the app role.
+- `blue-server token --github-id N` — issues a session token directly (local development and
+  first-time setup without a GitHub OAuth App; needs the database credentials).
 
 **gRPC services** (one port, h2c behind the ingress; TLS terminates at the ingress):
 
@@ -309,10 +311,17 @@ sessions       (id, machine_id FK, title, state, claude_session_id,
 turns          (id, session_id FK, index, instructions, state  -- queued|running|completed|failed
                 , result_text, duration_ms, error, created_at, started_at, finished_at)
 events         (id BIGSERIAL PK  -- global cursor
-                , session_id FK, turn_id FK NULL, seq, kind, payload JSONB, is_raw BOOL,
-                created_at, UNIQUE(session_id, seq))
+                , session_id FK NULL, turn_id NULL, seq NULL, kind, payload BYTEA, is_raw BOOL,
+                occurred_at, created_at, UNIQUE(session_id, seq))
 audit_log      (id, at, actor, action, detail JSONB)
 ```
+
+Event payloads are the protobuf messages themselves (`SessionEvent`, or `MachineStatus` for
+machine events, which have no session). Events the server makes itself (machine status, and
+failing the turns of a session a daemon lost) have no `seq`. Every event insert goes through
+one lock, so cursors become visible in order and a subscriber can't skip one. `sessions` also
+has `delivered` (the daemon has the session) and `turns` has `dispatched_at` (sent to the
+daemon, not yet started); reconnects resend what was dispatched but not started.
 
 Raw events are retained for a configurable window (default 14 days) by a periodic cleanup
 task; translated events are kept.
@@ -335,6 +344,9 @@ compiled into the bridge.)
 - `blue-daemon doctor` — checks: config valid, `claude` installed + version, bridge starts and
   reports a matching protocol version, server reachable and token accepted.
 
+`--dir` / `BLUE_DAEMON_DIR` moves the config, token and state elsewhere (several daemons on one
+box, tests); with it, the token is kept only in a file there.
+
 **Config:** `daemon.toml` in the OS config dir (`%APPDATA%\blue\` on Windows,
 `~/.config/blue/` elsewhere):
 
@@ -344,12 +356,17 @@ machine_name = "desktop"
 claude_path = "C:/Users/Jason/.local/bin/claude.exe"   # default: `claude` on PATH; required to exist
 bridge_path = ""                                        # default: next to blue-daemon
 start_directory = "~"                                   # where scouting starts (§4.1)
-max_concurrent_sessions = 4
 forward_raw = true
 ```
 
-Machine token is stored in the OS keyring (`keyring` crate), falling back to a file with
-restricted permissions.
+Machine token is stored in the OS keyring (`keyring` crate) on Windows and macOS, falling back
+to a file with restricted permissions; Linux always uses the file (the kernel keyring doesn't
+survive reboots and headless machines have no Secret Service).
+
+State lives in SQLite next to `daemon.toml`: the sessions the daemon owns (with their Claude
+session id and directory, for resuming), an outbox of events the server hasn't acknowledged,
+and processed command ids. Events are numbered and written to the outbox before they are sent.
+On startup, a turn the old process was running is failed ("the daemon stopped...").
 
 If a bridge exits unexpectedly mid-turn, that turn fails; the session's next prompt starts a
 new bridge that resumes the same Claude conversation. Idle bridges are closed after a timeout
@@ -550,6 +567,7 @@ k3d (for chart testing), Helm.
 |---|---|
 | `just db` | `docker compose up` Postgres 17 with an admin user |
 | `just server` | `blue-server db bootstrap && db migrate && serve` against local Postgres |
+| `just dev-token` | a session token without GitHub sign-in, for `BLUE_TOKEN` |
 | `just bridge` | `bun build --compile` the bridge into `target/bridge/` |
 | `just daemon` | `blue-daemon start` against `http://localhost:8080` |
 | `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local server directly (no tunnel needed) |
@@ -557,6 +575,7 @@ k3d (for chart testing), Helm.
 | `just session` | a Claude session in the terminal via `blue-daemon-test` (`--record` / `--replay`) |
 | `just test` | cargo tests, bridge tests, voice tests |
 | `just test-replay` | daemon ⇄ compiled bridge through a recorded session (no Claude login) |
+| `just test-e2e` | server + daemon processes + compiled bridge in replay mode, killing each mid-turn |
 | `just test-live` | real Claude sessions (needs a login; Haiku) |
 | `just chart-test` | k3d cluster + in-cluster Postgres + `helm install` + `helm test` |
 
@@ -577,11 +596,14 @@ Frontend during development: LiveKit Agents Playground, connecting with a token 
 - **Protocol:** `buf lint`; framing round-trip tests in Rust and TS; Python import/round-trip
   test; generated-code freshness check in CI; cross-language handshake (daemon ⇄ compiled bridge).
 - **Daemon:** `just test-replay` (in CI on Linux, macOS and Windows) — the daemon driving the
-  compiled bridge in replay mode through a recorded multi-turn session. Phase 2
-  adds outbox replay after a dropped server connection.
-- **Server:** integration tests against real Postgres (`testcontainers`), with an in-process fake
-  daemon and fake client over real gRPC streams: routing, dedupe, turn queueing, reconnect
-  reconciliation, auth failures.
+  compiled bridge in replay mode through a recorded multi-turn session.
+- **Server:** integration tests against real Postgres, with an in-process fake daemon and fake
+  client over real gRPC streams: routing, dedupe, turn queueing, reconnect reconciliation, auth
+  failures, GitHub sign-in against a fake GitHub. Postgres is `BLUE_TEST_DATABASE_URL` (a
+  service container in CI) or a throwaway server from `postgresql_embedded` (no Docker needed).
+- **End to end:** `just test-e2e` (in CI on Linux, macOS and Windows): real `blue-server` and
+  `blue-daemon` processes, the compiled bridge replaying slowly; kills the server mid-turn, then
+  the daemon, and checks every event arrived exactly once.
 - **Bootstrap/migrations:** test against a fresh Postgres with a non-superuser admin that has
   only `CREATEROLE CREATEDB`.
 - **Voice:** `livekit-agents` test harness with a mocked `ServerClient`: tool selection for
@@ -600,7 +622,8 @@ scope now.
 
 - **ci.yml** (PRs + main): `cargo fmt --check`, `clippy -D warnings`, `cargo test` (with
   Postgres service), bridge `tsc --noEmit` + tests, voice `ruff` + `pyright` + `pytest`,
-  `buf lint`, `just proto && git diff --exit-code`, `helm lint` + `ct lint`.
+  `buf lint`, `buf breaking` against `main`, `just proto && git diff --exit-code`, `helm lint` +
+  `ct lint`.
 - **chart-e2e.yml**: k3d + Postgres + install chart + `helm test`.
 - **release.yml** (tag `v*`):
   - server image → `ghcr.io/<owner>/blue-server:<version>` (amd64 + arm64)
@@ -635,11 +658,17 @@ separate, unshipped tool: `blue-daemon-test session [--cwd DIR] [--resume ID] [-
 [--record FILE | --replay FILE]` (`just session`), a Claude session in the terminal where each
 line is a prompt and `/quit` ends it.
 
-**Phase 2 — Server, protocol, daemon, CLI (local)**
+**Phase 2 — Server, protocol, daemon, CLI (local)** ✅ *done*
 Protocols in `crates/protocol`; server with Postgres, bootstrap, migrations, auth, pairing,
 routing, event log, fan-out, turn queue; daemon server connection + outbox + reconciliation; CLI.
 *Exit:* `blue run desktop "in the blue repo, …"` streams a full task through server → daemon → Claude and back;
 killing the server or the daemon mid-task loses no events.
+*Result:* met. `just test-e2e` kills the server mid-turn (the turn finishes and every event
+arrives once) and the daemon mid-turn (that turn fails, the next resumes the conversation);
+`blue run`/`blue send` ran real Claude turns through a local server and daemon. Also: LiveKit
+room tokens (`blue token`), `blue-server token` for working without a GitHub OAuth App, a
+`GetMachine` RPC for `doctor`'s token check, and `buf breaking` in CI. Not yet: a limit on
+concurrent sessions per daemon, raw-event retention, idle bridge reaping (phase 6).
 
 **Phase 3 — Voice agent (local worker)**
 Agent with tools, server client, notifier, system prompt; LiveKit Cloud project; Agents

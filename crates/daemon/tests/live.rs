@@ -67,6 +67,7 @@ async fn start(cwd: &Path, resume: Option<String>, fixture: &str) -> Session {
         resume_claude_session_id: resume,
         model: Some(MODEL.into()),
         replay: None,
+        forward_raw: false,
     })
     .await
     .expect("start session");

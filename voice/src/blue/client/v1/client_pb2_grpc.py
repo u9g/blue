@@ -27,7 +27,7 @@ if _version_not_supported:
 
 class ClientServiceStub:
     """Server API for clients: the voice agent, the CLI, and later the web UI.
-    Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
+    Auth: `authorization: Bearer <token>` metadata (voice service token or user session token).
     """
 
     def __init__(self, channel):
@@ -70,7 +70,7 @@ class ClientServiceStub:
 
 class ClientServiceServicer:
     """Server API for clients: the voice agent, the CLI, and later the web UI.
-    Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
+    Auth: `authorization: Bearer <token>` metadata (voice service token or user session token).
     """
 
     def ListMachines(self, request, context):
@@ -155,7 +155,7 @@ def add_ClientServiceServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class ClientService:
     """Server API for clients: the voice agent, the CLI, and later the web UI.
-    Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
+    Auth: `authorization: Bearer <token>` metadata (voice service token or user session token).
     """
 
     @staticmethod

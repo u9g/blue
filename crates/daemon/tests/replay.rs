@@ -23,6 +23,7 @@ async fn replays_a_recorded_session() {
         resume_claude_session_id: None,
         model: None,
         replay: Some(recording),
+        forward_raw: false,
     })
     .await
     .unwrap();

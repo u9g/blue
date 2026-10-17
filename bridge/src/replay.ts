@@ -1,11 +1,14 @@
 // Replay mode (BLUE_BRIDGE_REPLAY=<file>): instead of running Claude, each Prompt plays back the
 // next recorded turn — every SDK message up to and including its `result`. Recordings are the
 // JSON-lines files written by `blue-daemon-test session --record` and the daemon's live tests.
-// Used to test the daemon end to end without Claude.
+// Used to test the daemon end to end without Claude. BLUE_BRIDGE_REPLAY_DELAY_MS spaces the
+// messages out, so tests can interrupt a turn halfway.
 
 import { readFileSync } from "node:fs";
 import { send, sendError } from "./io.ts";
 import type { BridgeSession } from "./session.ts";
+
+const delayMs = Number(process.env.BLUE_BRIDGE_REPLAY_DELAY_MS ?? 0);
 
 export class ReplaySession implements BridgeSession {
   private readonly turns: string[][] = [];
@@ -27,7 +30,10 @@ export class ReplaySession implements BridgeSession {
     const turn = this.turns.shift();
     this.playing = this.playing.then(async () => {
       if (!turn) return sendError("replay has no more recorded turns");
-      for (const json of turn) await send({ case: "sdkMessage", value: { json } });
+      for (const json of turn) {
+        if (delayMs > 0) await Bun.sleep(delayMs);
+        await send({ case: "sdkMessage", value: { json } });
+      }
     });
   }
 

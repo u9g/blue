@@ -10,6 +10,15 @@ import "google/protobuf/timestamp.proto";
 service DaemonService {
   // Bidirectional session stream. The first request must be a Hello.
   rpc Attach(stream AttachRequest) returns (stream AttachResponse);
+  // Returns the calling machine. Lets `blue-daemon doctor` check its token without attaching.
+  rpc GetMachine(GetMachineRequest) returns (GetMachineResponse);
+}
+
+message GetMachineRequest {}
+
+message GetMachineResponse {
+  string machine_id = 1;
+  string machine_name = 2;
 }
 
 // Daemon -> server.
