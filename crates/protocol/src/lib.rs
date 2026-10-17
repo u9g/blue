@@ -36,3 +36,16 @@ pub mod auth {
         tonic::include_proto!("blue.auth.v1");
     }
 }
+
+impl events::v1::session_event::Kind {
+    /// Whether this event ends the turn it belongs to.
+    pub fn ends_turn(&self) -> bool {
+        matches!(self, Self::TurnCompleted(_) | Self::TurnFailed(_))
+    }
+}
+
+impl daemon::v1::DaemonEvent {
+    pub fn into_kind(self) -> Option<events::v1::session_event::Kind> {
+        self.event.and_then(|event| event.kind)
+    }
+}

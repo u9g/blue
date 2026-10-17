@@ -6,7 +6,7 @@
 import { isAbsolute } from "node:path";
 import pkg from "../package.json";
 import type { Start } from "./gen/blue/bridge/v1/bridge_pb.ts";
-import { commands, log, send } from "./io.ts";
+import { commands, log, send, sendError } from "./io.ts";
 import { ReplaySession } from "./replay.ts";
 import { Session, type BridgeSession } from "./session.ts";
 
@@ -39,14 +39,13 @@ async function main(): Promise<never> {
 
   let session: BridgeSession | undefined;
   const replay = process.env.BLUE_BRIDGE_REPLAY;
-  const error = (message: string) => send({ case: "error", value: { message } });
 
   for await (const input of commands()) {
     const command = input.command;
     switch (command.case) {
       case "start": {
         if (session) {
-          await error("Start was already received");
+          await sendError("Start was already received");
           break;
         }
         const problem = invalidStart(command.value);
@@ -56,7 +55,7 @@ async function main(): Promise<never> {
       }
       case "prompt":
         if (session) session.prompt(command.value.text);
-        else await error("Prompt before Start");
+        else await sendError("Prompt before Start");
         break;
       case "close":
         await session?.close();

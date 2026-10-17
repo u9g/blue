@@ -18,6 +18,11 @@ export function send(event: BridgeEvent): Promise<void> {
   );
 }
 
+/** A non-fatal problem for the daemon to log. */
+export function sendError(message: string): Promise<void> {
+  return send({ case: "error", value: { message } });
+}
+
 export function commands(): AsyncIterable<DaemonToBridge> {
   return sizeDelimitedDecodeStream(DaemonToBridgeSchema, Bun.stdin.stream());
 }

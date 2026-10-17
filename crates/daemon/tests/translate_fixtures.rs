@@ -18,12 +18,8 @@ fn translate_fixture(name: &str) -> String {
     let mut turn = 1;
     for line in recording.lines().filter(|line| !line.trim().is_empty()) {
         let turn_id = format!("t{turn}");
-        for kind in translator
-            .translate(line, Some(&turn_id))
-            .into_iter()
-            .filter_map(|event| event.kind)
-        {
-            let ends_turn = matches!(kind, Kind::TurnCompleted(_) | Kind::TurnFailed(_));
+        for kind in translator.translate(line, Some(&turn_id)) {
+            let ends_turn = kind.ends_turn();
             writeln!(out, "{}", describe(kind)).unwrap();
             if ends_turn {
                 turn += 1;

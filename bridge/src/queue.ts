@@ -8,22 +8,20 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
 
   push(item: T): void {
     if (this.ended) throw new Error("push after end");
-    if (this.waiting) {
-      const resolve = this.waiting;
-      this.waiting = undefined;
-      resolve({ value: item, done: false });
-    } else {
-      this.items.push(item);
-    }
+    if (!this.wake({ value: item, done: false })) this.items.push(item);
   }
 
   end(): void {
     this.ended = true;
-    if (this.waiting) {
-      const resolve = this.waiting;
-      this.waiting = undefined;
-      resolve({ value: undefined, done: true });
-    }
+    this.wake({ value: undefined, done: true });
+  }
+
+  /** Hands `result` to a pending `next()`, if there is one. */
+  private wake(result: IteratorResult<T>): boolean {
+    const resolve = this.waiting;
+    this.waiting = undefined;
+    resolve?.(result);
+    return resolve !== undefined;
   }
 
   [Symbol.asyncIterator](): AsyncIterator<T> {

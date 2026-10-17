@@ -3,36 +3,12 @@
 //! Ignored by default because it needs the compiled bridge; `just test-replay` builds it and
 //! runs this.
 
-use std::path::{Path, PathBuf};
-use std::time::Duration;
+mod common;
+
+use std::path::Path;
 
 use blue_daemon::session::{Session, SessionConfig};
-use blue_protocol::events::v1::{SessionState, session_event::Kind};
-use tokio::time::timeout;
-
-fn bridge_path() -> PathBuf {
-    std::env::var_os("BLUE_BRIDGE_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../target/bridge")
-                .join(format!("claude-bridge{}", std::env::consts::EXE_SUFFIX))
-        })
-}
-
-async fn next_turn_end(session: &mut Session) -> Kind {
-    timeout(Duration::from_secs(30), async {
-        loop {
-            let event = session.next().await.expect("session ended early");
-            match event.event.and_then(|e| e.kind) {
-                Some(kind @ (Kind::TurnCompleted(_) | Kind::TurnFailed(_))) => return kind,
-                _ => continue,
-            }
-        }
-    })
-    .await
-    .expect("timed out")
-}
+use common::{bridge_path, close, completed_turn};
 
 #[tokio::test]
 #[ignore = "needs the compiled bridge; use `just test-replay`"]
@@ -52,24 +28,9 @@ async fn replays_a_recorded_session() {
     .unwrap();
 
     for turn in ["t1", "t2", "t3"] {
-        session
-            .prompt(turn.into(), "replayed".into())
-            .await
-            .unwrap();
-        match next_turn_end(&mut session).await {
-            Kind::TurnCompleted(done) => assert_eq!(done.turn_id, turn),
-            other => panic!("turn {turn}: unexpected {other:?}"),
-        }
+        completed_turn(&mut session, turn, "replayed").await;
     }
     assert!(session.cwd().ends_with("calc"), "{}", session.cwd());
     assert!(session.claude_session_id().is_some());
-
-    session.close().await.unwrap();
-    let mut last_state = None;
-    while let Some(event) = session.next().await {
-        if let Some(Kind::SessionStateChanged(changed)) = event.event.and_then(|e| e.kind) {
-            last_state = Some(changed.state());
-        }
-    }
-    assert_eq!(last_state, Some(SessionState::Closed));
+    close(session).await;
 }
