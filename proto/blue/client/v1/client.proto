@@ -137,13 +137,13 @@ message InterruptSessionResponse {}
 
 message GetSessionRequest {
   string session_id = 1;
-  // How many of the most recent events to include.
-  uint32 recent_events = 2;
 }
 
 message GetSessionResponse {
   Session session = 1;
-  repeated Event recent_events = 2;
+  // Every event in the session, oldest first. Raw SDK messages are not included; use
+  // Subscribe with include_raw for those.
+  repeated Event events = 2;
 }
 
 message SubscribeRequest {

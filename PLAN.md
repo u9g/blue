@@ -288,7 +288,7 @@ Auth: `authorization: Bearer <token>` — the voice service token or a user sess
 | `CreateSession` | `machine, instructions, title` → `session, turn_id` |
 | `SendPrompt` | `session_id, instructions` → `turn_id` (queued if a turn is running) |
 | `InterruptSession` | `session_id` → — |
-| `GetSession` | `session_id, recent_events` → session + recent events |
+| `GetSession` | `session_id` → session + all its events (raw SDK messages excluded) |
 | `Subscribe` (server stream) | `cursor?, session_ids[], include_raw` → stream of `Event` |
 
 `Event { cursor, occurred_at, oneof kind { SessionEventEnvelope session, MachineStatus machine_status } }`.
@@ -507,7 +507,7 @@ auto-reconnects and resumes from its last cursor), a "focused session" id, and a
 | `list_sessions(active_only=True)` | sessions with machine, title, state |
 | `start_task(machine, title, instructions)` | `CreateSession`; the LLM names the session (a few words); focuses it |
 | `send_follow_up(instructions, session=None)` | `SendPrompt` to focused or named session |
-| `get_status(session=None)` | `GetSession` with recent events; LLM summarizes |
+| `get_status(session=None)` | `GetSession`; LLM summarizes the latest activity |
 | `interrupt(session=None)` | `InterruptSession` |
 | `focus_session(session)` | change focus by name/title/number |
 

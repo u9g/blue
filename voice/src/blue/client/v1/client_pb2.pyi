@@ -185,20 +185,18 @@ class InterruptSessionResponse(_message.Message):
     def __init__(self) -> None: ...
 
 class GetSessionRequest(_message.Message):
-    __slots__ = ("session_id", "recent_events")
+    __slots__ = ("session_id",)
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
-    RECENT_EVENTS_FIELD_NUMBER: _ClassVar[int]
     session_id: str
-    recent_events: int
-    def __init__(self, session_id: _Optional[str] = ..., recent_events: _Optional[int] = ...) -> None: ...
+    def __init__(self, session_id: _Optional[str] = ...) -> None: ...
 
 class GetSessionResponse(_message.Message):
-    __slots__ = ("session", "recent_events")
+    __slots__ = ("session", "events")
     SESSION_FIELD_NUMBER: _ClassVar[int]
-    RECENT_EVENTS_FIELD_NUMBER: _ClassVar[int]
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
     session: Session
-    recent_events: _containers.RepeatedCompositeFieldContainer[Event]
-    def __init__(self, session: _Optional[_Union[Session, _Mapping]] = ..., recent_events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...) -> None: ...
+    events: _containers.RepeatedCompositeFieldContainer[Event]
+    def __init__(self, session: _Optional[_Union[Session, _Mapping]] = ..., events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...) -> None: ...
 
 class SubscribeRequest(_message.Message):
     __slots__ = ("cursor", "session_ids", "include_raw")
