@@ -73,6 +73,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
         working-directory: bridge
-      # `claude` isn't installed on CI runners, so doctor reports it as FAIL; the bridge
-      # handshake is what this job checks (doctor exits non-zero if it fails).
+      # Blue requires Claude Code to be installed already; doctor fails without it.
+      # `--version` needs no login.
+      - run: npm install -g @anthropic-ai/claude-code
       - run: cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge${{ runner.os == 'Windows' && '.exe' || '' }}

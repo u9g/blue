@@ -111,7 +111,9 @@ export type Start = Message<"blue.bridge.v1.Start"> & {
   sessionId: string;
 
   /**
-   * Path to the installed `claude` executable, passed as pathToClaudeCodeExecutable.
+   * Absolute path to the machine's installed `claude`, resolved by the daemon and passed to the
+   * SDK as pathToClaudeCodeExecutable. Required: Blue never uses the SDK's bundled copy of
+   * Claude Code, so the bridge rejects a Start without it.
    *
    * @generated from field: string claude_path = 2;
    */

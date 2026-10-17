@@ -19,21 +19,42 @@ pub fn default_bridge_path() -> anyhow::Result<PathBuf> {
     Ok(exe.with_file_name(format!("claude-bridge{}", std::env::consts::EXE_SUFFIX)))
 }
 
-pub async fn run(bridge: &Path, claude: &Path) -> anyhow::Result<()> {
-    let ready = timeout(BRIDGE_TIMEOUT, bridge_handshake(bridge))
-        .await
-        .context("bridge handshake timed out")??;
-    println!(
-        "bridge  ok    {} (bridge {}, agent sdk {}, bun {})",
-        bridge.display(),
-        ready.bridge_version,
-        ready.sdk_version,
-        ready.runtime_version
-    );
+/// Checks everything a session needs, prints one line per check, and fails if any check failed.
+pub async fn run(bridge: &Path, claude: Option<&Path>) -> anyhow::Result<()> {
+    let mut ok = true;
 
-    match claude_version(claude).await {
-        Ok(version) => println!("claude  ok    {version}"),
-        Err(err) => println!("claude  FAIL  {err:#}"),
+    match crate::claude::resolve(claude).await {
+        Ok(install) => println!(
+            "claude  ok    {} ({})",
+            install.version,
+            install.path.display()
+        ),
+        Err(err) => {
+            ok = false;
+            println!("claude  FAIL  {err:#}");
+        }
+    }
+
+    match timeout(BRIDGE_TIMEOUT, bridge_handshake(bridge)).await {
+        Ok(Ok(ready)) => println!(
+            "bridge  ok    {} (bridge {}, agent sdk {}, bun {})",
+            bridge.display(),
+            ready.bridge_version,
+            ready.sdk_version,
+            ready.runtime_version
+        ),
+        Ok(Err(err)) => {
+            ok = false;
+            println!("bridge  FAIL  {err:#}");
+        }
+        Err(_) => {
+            ok = false;
+            println!("bridge  FAIL  handshake timed out after {BRIDGE_TIMEOUT:?}");
+        }
+    }
+
+    if !ok {
+        bail!("this machine is not ready to run Blue sessions");
     }
     Ok(())
 }
@@ -83,20 +104,4 @@ async fn next_event<R: AsyncRead + Unpin>(stdout: &mut R) -> anyhow::Result<brid
         .context("bridge closed stdout")?
         .event
         .context("bridge sent an empty frame")
-}
-
-async fn claude_version(claude: &Path) -> anyhow::Result<String> {
-    let output = Command::new(claude)
-        .arg("--version")
-        .output()
-        .await
-        .with_context(|| format!("run {} --version", claude.display()))?;
-    if !output.status.success() {
-        bail!(
-            "{} --version exited with {}",
-            claude.display(),
-            output.status
-        );
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }

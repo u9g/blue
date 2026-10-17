@@ -419,13 +419,21 @@ task; translated events are kept.
 
 ### 6.3 Daemon (`crates/daemon`, bin `blue-daemon`)
 
+**Requirement: Claude Code is already installed and logged in.** Blue never bundles or installs
+Claude. At startup the daemon resolves `claude` (from `claude_path` / `BLUE_CLAUDE_PATH`, else
+PATH), runs `claude --version`, and refuses to start if either fails, with install instructions.
+It reports the version in `Hello.versions.claude` and passes the resolved absolute path to every
+bridge in `Start.claude_path`, so the Agent SDK never falls back to the copy of Claude Code it
+ships as an npm dependency. (That copy is ~280 MB in `node_modules` on dev machines, but is not
+compiled into the bridge.)
+
 **Subcommands:**
 
 - `blue-daemon pair --server https://server.example.com --code ABCD-1234 [--name desktop]`
 - `blue-daemon start` — foreground.
 - `blue-daemon service install|uninstall|status` — via the `service-manager` crate
   (Windows service / launchd / systemd user unit).
-- `blue-daemon doctor` — checks: config valid, `claude` found + version, bridge starts and
+- `blue-daemon doctor` — checks: config valid, `claude` installed + version, bridge starts and
   reports a matching protocol version, server reachable and token accepted.
 
 **Config:** `daemon.toml` in the OS config dir (`%APPDATA%\blue\` on Windows,
@@ -434,7 +442,7 @@ task; translated events are kept.
 ```toml
 server_url = "https://server.example.com"
 machine_name = "desktop"
-claude_path = "C:/Users/Jason/.local/bin/claude.exe"   # auto-detected if omitted
+claude_path = "C:/Users/Jason/.local/bin/claude.exe"   # default: `claude` on PATH; required to exist
 bridge_path = ""                                        # default: next to blue-daemon
 max_concurrent_sessions = 4
 forward_raw = true
@@ -466,8 +474,8 @@ restricted permissions.
 - ~200 lines: decode size-delimited `BridgeInput` frames from stdin, one `query()` per
   process, async-iterable input queue for prompts, forward every yielded message as
   `SdkMessage { json }`, handle `Interrupt`/`Close`, emit `Exited`.
-- Always passes `pathToClaudeCodeExecutable` (the daemon supplies the installed `claude`), so
-  the bundled-CLI resolution inside the SDK is never relied on.
+- Always passes `pathToClaudeCodeExecutable` from `Start.claude_path` (the machine's installed
+  `claude`); a `Start` without it is rejected, so the SDK's bundled copy is never used.
 - Built with `bun build --compile` for `bun-windows-x64`, `bun-darwin-arm64`,
   `bun-darwin-x64`, `bun-linux-x64`, `bun-linux-arm64`; shipped next to `blue-daemon`.
 - `--replay <fixture>` mode: emits a recorded stream instead of calling the SDK, for

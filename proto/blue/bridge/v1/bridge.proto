@@ -32,7 +32,9 @@ message BridgeOutput {
 // Claude always starts in the user's home directory and may work anywhere on the machine.
 message Start {
   string session_id = 1;
-  // Path to the installed `claude` executable, passed as pathToClaudeCodeExecutable.
+  // Absolute path to the machine's installed `claude`, resolved by the daemon and passed to the
+  // SDK as pathToClaudeCodeExecutable. Required: Blue never uses the SDK's bundled copy of
+  // Claude Code, so the bridge rejects a Start without it.
   string claude_path = 2;
   // Claude session id to resume, if continuing an existing conversation.
   optional string resume_claude_session_id = 3;

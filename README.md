@@ -23,7 +23,11 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 
 ## Prerequisites
 
-Rust (stable), [Bun](https://bun.sh), [uv](https://docs.astral.sh/uv/), and
+Every machine that runs `blue-daemon` must already have
+[Claude Code](https://code.claude.com/docs/en/setup) installed and logged in. Blue never bundles
+Claude; `blue-daemon doctor` checks for it.
+
+For development: Rust (stable), [Bun](https://bun.sh), [uv](https://docs.astral.sh/uv/), and
 [just](https://just.systems). No `protoc` install is needed: Rust uses a vendored `protoc`,
 TypeScript uses `buf` from npm, Python uses `grpcio-tools`.
 

@@ -1,3 +1,4 @@
+mod claude;
 mod doctor;
 
 use std::path::PathBuf;
@@ -22,9 +23,9 @@ enum Command {
         /// Path to the claude-bridge executable. Defaults to the one next to blue-daemon.
         #[arg(long, env = "BLUE_BRIDGE_PATH")]
         bridge: Option<PathBuf>,
-        /// Path to the `claude` executable.
-        #[arg(long, env = "BLUE_CLAUDE_PATH", default_value = "claude")]
-        claude: PathBuf,
+        /// Path to the installed `claude` executable. Defaults to `claude` on PATH.
+        #[arg(long, env = "BLUE_CLAUDE_PATH")]
+        claude: Option<PathBuf>,
     },
 }
 
@@ -36,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
                 Some(path) => path,
                 None => doctor::default_bridge_path()?,
             };
-            doctor::run(&bridge, &claude).await
+            doctor::run(&bridge, claude.as_deref()).await
         }
     }
 }
