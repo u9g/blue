@@ -1,9 +1,8 @@
-mod claude;
-mod doctor;
-
 use std::path::PathBuf;
 
+use blue_daemon::doctor;
 use clap::{Parser, Subcommand};
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(
@@ -31,6 +30,11 @@ enum Command {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .init();
+
     match Cli::parse().command {
         Command::Doctor { bridge, claude } => {
             let bridge = match bridge {

@@ -19,7 +19,7 @@ per-machine daemons that we own, and with voice as the frontend.
 - Speak a task ("on my desktop, in the blue repo, add a health endpoint") and have Claude Code
   do it on that machine.
 - Hear back when work finishes, with a short spoken summary; ask "what's it doing?" any time.
-- Follow up, interrupt, and switch between sessions and machines by voice.
+- Follow up and switch between sessions and machines by voice.
 - Multiple machines, each connecting outbound to the server (no inbound ports, works behind NAT).
 - Sessions survive server restarts, daemon restarts, and network drops.
 - Server is a Helm chart deployable to a self-run Kubernetes cluster, backed by external Postgres.
@@ -30,7 +30,7 @@ per-machine daemons that we own, and with voice as the frontend.
 - Permission prompts. Claude runs with `bypassPermissions`; the protocol reserves room to add
   approval later.
 - A custom web UI. LiveKit's Agents Playground is the frontend until phase 7.
-- Horizontal scaling of the server. One replica; see §11 for the path to more.
+- Horizontal scaling of the server. One replica; see §10 for the path to more.
 
 ---
 
@@ -53,12 +53,12 @@ stdio adapter around `query()`.
 | Link | Transport | Encoding |
 |---|---|---|
 | bridge ⇄ daemon | child-process stdin/stdout | length-delimited protobuf frames (varint length + message) |
-| daemon ⇄ server | gRPC over HTTP/2 + TLS (`DaemonService.Attach`, bidi stream) | protobuf |
-| voice ⇄ server | gRPC (`ClientService`, `AuthService`) | protobuf |
-| cli ⇄ server | gRPC (same services) | protobuf |
+| daemon ⇄ server | gRPC over HTTP/2 + TLS (one bidirectional stream per daemon) | protobuf |
+| voice ⇄ server | gRPC | protobuf |
+| cli ⇄ server | gRPC (same services as voice) | protobuf |
 
 The only JSON in the system is content we don't own: the Agent SDK's `SDKMessage` objects,
-which ride inside protobuf as an opaque `json` string field (§5.2).
+which ride inside protobuf as an opaque JSON string (§4.1).
 
 Codegen: Rust via `tonic-prost-build` (with a vendored `protoc`, no install needed), TypeScript
 via `@bufbuild/protoc-gen-es` (driven by `buf generate`), Python via `grpcio-tools`. `buf lint`
@@ -75,7 +75,7 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
   ┌─────────────── LiveKit Cloud ───────────┐    │
   │ SFU  ◀──▶  voice (Python agent job)     │    │
   └──────────────────┬──────────────────────┘    │
-                     │ gRPC ClientService (protobuf, service token)
+                     │ gRPC (protobuf, service token)
                      ▼                           │
   ┌──────────── self-run k8s (Helm: blue-server) ┴──────────┐
   │  server (Rust, tonic gRPC)                              │
@@ -86,7 +86,7 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
                ▼
          external Postgres (database `blue`, role `blue_server`)
                ▲
-               │ gRPC DaemonService.Attach bidi stream (outbound, machine token)
+               │ gRPC bidi stream (outbound, machine token)
   ┌────────────┴───────────── each machine ─────────────────┐
   │ blue-daemon (Rust)                                       │
   │  server connection · session supervisor · SDK→event      │
@@ -106,81 +106,31 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
 1. I say "in the blue repo on my desktop, add a health endpoint."
 2. Voice LLM calls `start_task(machine="desktop", title="Health endpoint", instructions="in the
    blue repo, add a health endpoint")`.
-3. Voice sends `session.create` to the server; server persists session + turn, routes
-   `session.start` to the desktop daemon; voice immediately says "On it."
-4. Daemon spawns a bridge, sends `start` + `prompt`. Bridge calls `query()`.
+3. Voice asks the server to create the session; the server stores the session and its first
+   turn and tells the desktop daemon to start it; voice immediately says "On it."
+4. The daemon spawns a bridge and hands it the prompt. The bridge finds the project (§4.1) and
+   starts Claude there.
 5. SDK messages stream bridge → daemon (raw). Daemon translates to events, writes them to its
    outbox, sends them to the server; server stores them and fans out to subscribers.
 6. Voice stays quiet during progress. If I ask "what's it doing?", it calls `get_status`, which
    returns recent progress events, and summarizes.
-7. On `turn.completed`, voice waits for a quiet moment and speaks a 1–2 sentence summary.
+7. When the turn completes, voice waits for a quiet moment and speaks a 1–2 sentence summary.
 8. "Also add a test for it" → `send_follow_up` → same session, same bridge process, next turn.
 
 ---
 
-## 4. Repository layout
+## 4. Protocols
 
-Monorepo at `~/documents/code/blue`.
+The `.proto` files under `proto/blue/<area>/v1/` are the source of truth for every message;
+this plan doesn't repeat them. `buf lint` (STANDARD rules) runs in CI.
 
-```
-blue/
-├── PLAN.md
-├── README.md
-├── justfile                   # cross-language task runner (dev, codegen, build, test)
-├── Cargo.toml                 # Rust workspace
-├── rust-toolchain.toml
-├── package.json               # bun workspace root (bridge) + buf tooling
-├── buf.yaml, buf.gen.yaml     # proto lint/breaking config + TS codegen
-├── proto/                     # ★ single source of truth for every wire protocol
-│   └── blue/
-│       ├── events/v1/events.proto   # SessionEvent (translated from SDK messages)
-│       ├── bridge/v1/bridge.proto   # daemon ⇄ bridge stdio frames
-│       ├── daemon/v1/daemon.proto   # DaemonService (server ⇄ daemon)
-│       ├── client/v1/client.proto   # ClientService (server ⇄ voice/cli)
-│       └── auth/v1/auth.proto       # AuthService (GitHub login, LiveKit tokens, pairing)
-├── crates/
-│   ├── protocol/              # generated Rust (tonic/prost, build.rs) + framing helpers
-│   │   └── src/{lib.rs, framing.rs}
-│   ├── server/                # bin: blue-server
-│   │   ├── src/{main.rs, config.rs, grpc/, auth/, db/, routing/, livekit.rs}
-│   │   ├── migrations/        # sqlx migrations (embedded)
-│   │   └── Dockerfile
-│   ├── daemon/                # bin: blue-daemon
-│   │   └── src/{main.rs, config.rs, server_conn.rs, supervisor.rs, bridge_proc.rs,
-│   │            translate.rs, outbox.rs, service.rs, doctor.rs}
-│   └── cli/                   # bin: blue
-├── bridge/                    # TypeScript: claude-bridge
-│   ├── package.json, tsconfig.json
-│   ├── src/{main.ts, session.ts, io.ts}
-│   ├── src/gen/               # generated by protoc-gen-es (committed)
-│   └── fixtures/              # recorded raw SDK message streams
-├── voice/                     # Python: LiveKit agent
-│   ├── pyproject.toml, uv.lock
-│   ├── Dockerfile
-│   ├── src/blue_voice/{agent.py, tools.py, server_client.py, notifier.py, prompts.py}
-│   ├── src/blue/              # generated by grpcio-tools (committed; needed for LiveKit Cloud builds)
-│   └── tests/
-├── deploy/
-│   ├── helm/blue-server/      # the Helm chart (§9)
-│   ├── db/bootstrap.sql       # manual alternative to the bootstrap hook
-│   └── compose/compose.yaml   # local Postgres (+ optional server container)
-└── .github/workflows/         # §12
-```
-
----
-
-## 5. Protocols
-
-Every protocol is a set of `.proto` files under `proto/blue/<area>/v1/`. Package names follow
-the directory (`blue.daemon.v1`, …); `buf lint` (STANDARD rules) runs in CI.
-
-| Package | File | Used by |
-|---|---|---|
-| `blue.events.v1` | `events.proto` | `SessionEvent` + `SessionState` shared by daemon, server, clients |
-| `blue.bridge.v1` | `bridge.proto` | daemon ⇄ bridge stdio |
-| `blue.daemon.v1` | `daemon.proto` | `DaemonService` (server ⇄ daemon) |
-| `blue.client.v1` | `client.proto` | `ClientService` (server ⇄ voice, cli, later web) |
-| `blue.auth.v1` | `auth.proto` | `AuthService` (GitHub login, LiveKit tokens, pairing, revocation) |
+| Area | Link |
+|---|---|
+| `events` | session events shared by daemon, server and clients |
+| `bridge` | daemon ⇄ bridge, over stdio |
+| `daemon` | server ⇄ daemon |
+| `client` | server ⇄ voice agent, CLI, later web |
+| `auth` | GitHub sign-in, LiveKit tokens, daemon pairing |
 
 Generated code:
 
@@ -194,125 +144,101 @@ Generated code:
 
 **Versioning.** The `v1` in the package is the wire major version. Within v1, changes are
 additive only (`buf breaking` against `main` once phase 2 lands). Handshakes also carry a
-`protocol_version` integer so mismatched binaries fail fast with a readable error.
+protocol version number so mismatched binaries fail fast with a readable error.
 
-### 5.1 Daemon ⇄ Bridge (stdio, `blue.bridge.v1`)
+### 4.1 Daemon ⇄ Bridge (stdio)
 
 One bridge process per session. **stdout carries only protocol frames**; stderr is logs
-(daemon forwards them into `tracing`).
+(daemon forwards them into `tracing`). Each frame is a protobuf varint length followed by that
+many bytes of message — the standard "size-delimited" format.
 
-Framing: each frame is a protobuf varint length followed by that many bytes of message —
-the standard "size-delimited" format (`prost::Message::encode_length_delimited` in Rust,
-`sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`).
+The daemon starts a session, sends one prompt per turn, and finally asks the bridge to close.
+The bridge reports that it's ready (with its versions), forwards every Agent SDK message
+verbatim as JSON, reports non-fatal errors, and sends a final frame saying why it exited. SDK
+messages stay opaque JSON on purpose: their shapes are Anthropic's and change between SDK
+releases, so the bridge doesn't reinterpret them; the daemon parses what it needs. If the
+bridge dies without its final frame (crash or kill), the daemon uses the OS exit status and
+recent stderr as the reason.
 
-- Daemon → bridge: `DaemonToBridge { oneof command { Start, Prompt, Interrupt, Close } }`
-  - `Start { session_id, claude_path, resume_claude_session_id?, model? }`
-  - `Prompt { text }` — no turn id: the server sends a session's next prompt only after the
-    current turn ends, so the daemon always knows which turn the bridge is running
-  - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
-- Bridge → daemon: `BridgeToDaemon { oneof event { Ready, SdkMessage, Error, Exited } }`
-  - `Ready { protocol_version, bridge_version, sdk_version, runtime_version }` — sent first
-  - `SdkMessage { json }` — the `SDKMessage` exactly as the SDK yielded it, `JSON.stringify`'d.
-    This is the one deliberate opaque field: the SDK's message shapes are Anthropic's and change
-    with SDK releases, so the bridge doesn't reinterpret them; the daemon parses what it needs.
-  - `Error { message }` — always non-fatal; the bridge keeps running
-  - `Exited { error }` — last frame before exiting; `error` says why, empty on a clean shutdown.
-    The daemon gets the exit status from the OS, and treats the bridge dying without `Exited`
-    (crash or kill) as a failure, using the exit status and recent stderr as the reason
+**Working directory: scout, then work.** A session's working directory decides which
+`CLAUDE.md`, `.claude/` settings and git context Claude Code loads, and where it stores the
+session for `resume` — and it can't change once the session starts (the SDK has no way to). So
+a new session runs in two steps:
 
-Bridge behavior: `query({ prompt: asyncIterableOfUserMessages, options: { cwd: os.homedir(), resume,
-permissionMode: "bypassPermissions", pathToClaudeCodeExecutable: claudePath, model } })`.
-`Interrupt` → `q.interrupt()`. `Close` or stdin EOF ends the input iterable so the query finishes
-cleanly. Partial messages (`includePartialMessages`, token-by-token `stream_event`s) stay off:
-nothing consumes them, and voice only needs finished steps. If a web UI wants live typing later,
-it's one additive field on `Start`.
+1. **Scout.** On the first prompt, the bridge runs a short throwaway query in the daemon's
+   starting directory (home by default) with Haiku, read-only tools (`Glob`, `Grep`, `Read`), no
+   settings, no persistence, and one custom in-process tool, `set_project_directory(path)`. Its
+   only job is to find the directory the request is about and call that tool. Its messages are
+   logged, not forwarded. If it ends without choosing, the bridge reports a non-fatal error and
+   uses the starting directory.
+2. **Work.** The real session starts in the chosen directory with the same first prompt, using
+   Claude Code's own system prompt and all settings sources (so the project's `CLAUDE.md`
+   loads), `bypassPermissions`, and the machine's installed `claude`. Claude can still work
+   anywhere the OS user can. Follow-ups go into the same query; a task in another repo is a new
+   session.
 
-**Working directory.** Claude always starts in the user's home directory and can work anywhere
-the OS user can. There is no project list; the instructions say which repo or directory to work
-in ("in the blue repo, …"). A fixed starting directory also keeps `resume` simple, since Claude
-Code files its session transcripts under the directory a session started in.
+The daemon learns the chosen directory when the session starts and passes it back when
+resuming, which skips scouting.
+
+**No interrupts.** A turn runs until Claude finishes it. Closing (or stdin EOF) lets the current
+turn finish, scouting included, then ends the session cleanly. The only way to stop a running
+turn is to kill the bridge, which fails the turn. Partial messages (`includePartialMessages`)
+stay off: nothing consumes them, and voice only needs finished steps.
+
+**Replay mode.** With `BLUE_BRIDGE_REPLAY=<recording>`, the bridge plays back one recorded turn
+per prompt instead of running Claude, so the daemon ⇄ bridge path is testable without a login.
 
 Daemon-side process control: the bridge (and the `claude` it spawns) run in a Windows Job
 Object / Unix process group so a hard kill takes down the whole tree.
 
-### 5.2 Daemon ⇄ Server (`blue.daemon.v1.DaemonService`)
-
-```proto
-service DaemonService {
-  rpc Attach(stream AttachRequest) returns (stream AttachResponse);
-}
-```
+### 4.2 Daemon ⇄ Server
 
 One long-lived bidirectional gRPC stream per daemon, opened outbound from the machine.
 Auth: `authorization: Bearer <machine token>` metadata. HTTP/2 keepalive pings every 20 s;
 the daemon reconnects with jittered backoff when the stream ends.
 
-Daemon → server (`AttachRequest.oneof message`):
-
-| Message | Fields | Notes |
-|---|---|---|
-| `Hello` | `protocol_version, versions{daemon, bridge, sdk, claude}, os, arch, sessions[{session_id, claude_session_id, state, last_seq}]` | must be first |
-| `DaemonEvent` | `session_id, seq, turn_id, occurred_at, blue.events.v1.SessionEvent event` | `seq` per-session, monotonic, outbox-backed |
-| `CommandResult` | `command_id, ok, error_code, error_message` | reply to a server `Command` |
-
-Server → daemon (`AttachResponse.oneof message`):
-
-| Message | Fields |
-|---|---|
-| `Welcome` | `machine_id, map<session_id, acked_seq>` — daemon trims/replays its outbox |
-| `Command` | `command_id` + `oneof { StartSession, SendPrompt, InterruptSession, CloseSession }` |
-| `EventsAck` | `session_id, up_to_seq` — daemon deletes outbox rows ≤ seq |
-
-- `StartSession { session_id, resume_claude_session_id?, model? }`
-- `SendPrompt { session_id, turn_id, text }`
-- `InterruptSession { session_id }`, `CloseSession { session_id }`
+The daemon introduces itself first (versions, OS, the sessions it knows about), then streams
+session events; the server sends commands (start a session, send a prompt, close a session)
+and acknowledges stored events.
 
 Delivery guarantees:
 
-- Daemon → server events are **at-least-once**; server dedupes on `(session_id, seq)`.
-- Server → daemon commands are idempotent by `command_id`; daemon keeps recently processed ids
-  (persisted in its SQLite).
-- On reconnect, `Hello.sessions` + `Welcome.acked_seqs` reconcile state: server marks sessions it
-  believed running but the daemon doesn't know as failed ("daemon lost session"); daemon replays
-  unacked outbox entries.
+- Daemon → server events are **at-least-once**, numbered per session; the server dedupes on
+  (session, sequence number).
+- Server → daemon commands are idempotent by command id; the daemon keeps recently processed
+  ids (persisted in its SQLite).
+- On reconnect, the two sides compare what each has: the server marks sessions it believed
+  running but the daemon doesn't know as failed ("daemon lost session"), and the daemon replays
+  events the server hasn't acknowledged.
 
-### 5.3 Client ⇄ Server (`blue.client.v1.ClientService`)
+### 4.3 Client ⇄ Server
 
 Used by voice, the CLI, and later the web UI (via gRPC-Web from `tonic-web`).
 Auth: `authorization: Bearer <token>` — the voice service token or a user session token.
 
-| RPC | Request → Response |
-|---|---|
-| `ListMachines` | — → machines with online status |
-| `ListSessions` | `machine?, active_only` → sessions |
-| `CreateSession` | `machine, instructions, title` → `session, turn_id` |
-| `SendPrompt` | `session_id, instructions` → `turn_id` (queued if a turn is running) |
-| `InterruptSession` | `session_id` → — |
-| `GetSession` | `session_id` → session + all its events (raw SDK messages excluded) |
-| `Subscribe` (server stream) | `cursor?, session_ids[], include_raw` → stream of `Event` |
+Clients can list machines and sessions, create a session (machine, instructions, title), send
+a follow-up (queued if a turn is running), fetch a session with all its events, and subscribe
+to a live event stream. Each event carries a global cursor; a reconnecting subscriber passes
+its last cursor to resume without missing anything.
 
-`Event { cursor, occurred_at, oneof kind { SessionEventEnvelope session, MachineStatus machine_status } }`.
-`cursor` is the global `events.id`; a reconnecting subscriber passes its last cursor to resume.
+Machines can be named by id or name; the server resolves names case-insensitively and, when a
+name is ambiguous, returns the candidates so the voice agent can ask.
 
-`machine` accepts an id or name; the server resolves names case-insensitively. Errors
-use gRPC status codes: `NOT_FOUND`, and `FAILED_PRECONDITION` for ambiguity, with an
-`AmbiguousTarget { candidates[] }` message in the status details so the voice agent can ask.
-
-### 5.4 Auth (`blue.auth.v1.AuthService`)
+### 4.4 Auth
 
 **GitHub is the only way to sign in.** There are no passwords. The server is registered as a
 GitHub OAuth App and runs GitHub's
 [device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow)
 on the client's behalf, so clients never handle GitHub tokens or OAuth secrets:
 
-1. Client calls `LoginWithGitHub` (a server-streaming RPC).
-2. Server requests a device code from GitHub and streams back `DeviceCode { user_code,
-   verification_uri, expires_at }`. The CLI prints it (and opens the browser).
-3. User enters the code at `github.com/login/device` and approves.
-4. Server polls GitHub at the interval GitHub specifies, receives an access token, calls
+1. The client starts a GitHub login (a server-streaming call).
+2. The server requests a device code from GitHub and streams back the code and URL. The CLI
+   prints it (and opens the browser).
+3. The user enters the code at `github.com/login/device` and approves.
+4. The server polls GitHub at the interval GitHub specifies, receives an access token, calls
    `GET /user`, then **discards the GitHub token**.
-5. If the GitHub user id is in the allowlist, the server creates a Blue session and streams
-   `LoginComplete { session_token, expires_at, user }`. Otherwise `PERMISSION_DENIED`.
+5. If the GitHub user id is in the allowlist, the server creates a Blue session and streams back
+   a session token. Otherwise the login is refused.
 
 The OAuth App requests no scopes; `/user` works without any. Device flow needs only the
 client id (no secret). The allowlist is by GitHub numeric user id, which survives username
@@ -322,45 +248,27 @@ A browser web UI (phase 7) would use the standard redirect flow instead, which n
 client secret and one plain HTTPS callback endpoint on the server (GitHub redirects the browser
 there, so it can't be gRPC). The session token it issues is the same.
 
-| RPC | Auth | Purpose |
-|---|---|---|
-| `LoginWithGitHub` (server stream) | — | device flow → `DeviceCode`, then `LoginComplete` with a session token |
-| `Logout` | session token | revoke the calling session |
-| `GetCurrentUser` | session token | who am I |
-| `CreateLiveKitToken` | session token | mint a room token with agent dispatch for `blue-voice` |
-| `CreatePairingCode` | session token | one-time code, 10 min TTL |
-| `ClaimPairingCode` | the code | daemon exchanges code + machine name → `machine_id`, machine token |
-| `RevokeMachine` | session token | revoke a machine token and drop its stream |
+With a session token, a user can also log out, mint a LiveKit room token that dispatches the
+voice agent, create a one-time pairing code for a new daemon (10-minute TTL), and revoke a
+machine. A daemon exchanges a pairing code for its machine token.
 
-Session tokens are opaque random values stored hashed in Postgres (not JWTs), so `Logout` and
+Session tokens are opaque random values stored hashed in Postgres (not JWTs), so logout and
 revocation take effect immediately. Default lifetime 30 days.
 
-### 5.5 Event model (`blue.events.v1.SessionEvent`)
+### 4.5 Session events
 
-The daemon translates raw `SDKMessage` JSON into `SessionEvent` (`crates/daemon/src/translate.rs`,
-tested against recorded fixtures). `SessionEvent` is a `oneof`:
-
-| Variant | From | Fields |
-|---|---|---|
-| `SessionStarted` | SDK `system` / `init` | `claude_session_id, model, cwd` |
-| `TurnStarted` | daemon, on prompt sent | `turn_id` |
-| `AssistantText` | SDK `assistant` text blocks | `text` (complete block, not partials) |
-| `ToolStarted` | SDK `assistant` tool_use blocks | `tool_use_id, tool, summary` e.g. `Edit src/main.rs`, `Bash: cargo test` |
-| `ToolFinished` | SDK `user` tool_result blocks | `tool_use_id, is_error` |
-| `TurnCompleted` | SDK `result` (success) | `turn_id, result_text, duration_ms, num_turns, cost_usd` |
-| `TurnFailed` | SDK `result` (error) / bridge crash | `turn_id, reason` |
-| `TurnInterrupted` | after interrupt | `turn_id` |
-| `SessionStateChanged` | daemon | `SessionState` enum: `STARTING, IDLE, RUNNING, CLOSED, FAILED` |
-| `RawSdkMessage` | every SDK message (if `forward_raw`) | `json` |
-
-`MachineStatus { machine_id, online }` is produced by the server, not the daemon, and lives in
-`blue.client.v1.Event`. Unknown SDK message types are logged and forwarded raw, never fatal.
+The daemon translates raw Agent SDK messages into Blue session events, tested against recorded
+fixtures. Events cover: the Claude session starting (with its model and directory), a turn
+starting, complete assistant text, tool calls starting and finishing (each with a short
+speakable summary like `Edit src/main.rs` or `Bash: Run tests`), a turn completing or failing,
+and the session's state changing. The server adds machine online/offline events. Unknown SDK
+message types are logged and forwarded raw, never fatal.
 
 ---
 
-## 6. Components in detail
+## 5. Components in detail
 
-### 6.1 Server (`crates/server`, bin `blue-server`)
+### 5.1 Server (`crates/server`, bin `blue-server`)
 
 **Stack:** tokio, tonic (gRPC; `tonic-health` for probes, `tonic-web` later for the browser), sqlx (Postgres, compile-time-checked queries, embedded
 migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/user`), `tracing`,
@@ -369,28 +277,15 @@ migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/us
 **Subcommands** (one image, three roles):
 
 - `blue-server serve` — the server.
-- `blue-server db bootstrap` — uses the admin DSN to create role + database (§7).
+- `blue-server db bootstrap` — uses the admin DSN to create role + database (§6).
 - `blue-server db migrate` — runs embedded migrations as the app role.
 
 **gRPC services** (one port, h2c behind the ingress; TLS terminates at the ingress):
 
 - `grpc.health.v1.Health` — liveness/readiness (readiness = DB reachable + migrations current);
   Kubernetes uses native gRPC probes.
-- `blue.auth.v1.AuthService`, `blue.client.v1.ClientService`, `blue.daemon.v1.DaemonService`
-  (§5). An interceptor maps the bearer token to a principal (user / voice / machine) and each
-  RPC checks the principal kind it requires.
-
-**Internals:**
-
-- `routing::Registry` — in-memory map `machineId → daemon stream handle` (mpsc sender);
-  online/offline derived from it and broadcast as `machine.status`.
-- `routing::Fanout` — `tokio::sync::broadcast` of persisted events to client subscribers;
-  slow subscribers get dropped and resume from their cursor.
-- Write path: `DaemonEvent` → insert (`ON CONFLICT DO NOTHING` on `(session_id, seq)`) →
-  update session/turn rows → broadcast → `events.ack` to daemon.
-- Turn queue: if a `session.prompt` arrives while a turn is running, it is persisted as
-  `queued` and dispatched on the next `turn.completed`/`failed`/`interrupted`.
-- Graceful shutdown on SIGTERM: health → NOT_SERVING, end daemon/client streams, flush, exit.
+- The auth, client and daemon services (§4). Each call requires a particular kind of
+  caller: a user, the voice agent, or a machine.
 
 **Config (env):** `BLUE_DATABASE_URL`, `BLUE_PUBLIC_URL`,
 `BLUE_VOICE_TOKEN` (compared in constant time; stored hashed at startup),
@@ -399,7 +294,7 @@ migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/us
 `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `BLUE_AGENT_NAME` (default
 `blue-voice`), `RUST_LOG`.
 
-### 6.2 Database schema (Postgres)
+### 5.2 Database schema (Postgres)
 
 ```
 users          (id, github_id BIGINT UNIQUE, github_login, name, avatar_url,
@@ -411,8 +306,8 @@ machines       (id, name UNIQUE, token_hash, os, arch, daemon_version, bridge_ve
 pairing_codes  (code_hash PK, created_by, expires_at, claimed_at, machine_id)
 sessions       (id, machine_id FK, title, state, claude_session_id,
                 created_at, updated_at, last_activity_at)
-turns          (id, session_id FK, index, instructions, state  -- queued|running|completed|failed|interrupted
-                , result_text, cost_usd, duration_ms, error, created_at, started_at, finished_at)
+turns          (id, session_id FK, index, instructions, state  -- queued|running|completed|failed
+                , result_text, duration_ms, error, created_at, started_at, finished_at)
 events         (id BIGSERIAL PK  -- global cursor
                 , session_id FK, turn_id FK NULL, seq, kind, payload JSONB, is_raw BOOL,
                 created_at, UNIQUE(session_id, seq))
@@ -422,14 +317,13 @@ audit_log      (id, at, actor, action, detail JSONB)
 Raw events are retained for a configurable window (default 14 days) by a periodic cleanup
 task; translated events are kept.
 
-### 6.3 Daemon (`crates/daemon`, bin `blue-daemon`)
+### 5.3 Daemon (`crates/daemon`, bin `blue-daemon`)
 
 **Requirement: Claude Code is already installed and logged in.** Blue never bundles or installs
 Claude. At startup the daemon resolves `claude` (from `claude_path` / `BLUE_CLAUDE_PATH`, else
 PATH), runs `claude --version`, and refuses to start if either fails, with install instructions.
-It reports the version in `Hello.versions.claude` and passes the resolved absolute path to every
-bridge in `Start.claude_path`, so the Agent SDK never falls back to the copy of Claude Code it
-ships as an npm dependency. (That copy is ~280 MB in `node_modules` on dev machines, but is not
+It reports the version to the server and passes the resolved absolute path to every bridge, so
+the Agent SDK never falls back to the copy of Claude Code it ships as an npm dependency. (That copy is ~280 MB in `node_modules` on dev machines, but is not
 compiled into the bridge.)
 
 **Subcommands:**
@@ -449,6 +343,7 @@ server_url = "https://server.example.com"
 machine_name = "desktop"
 claude_path = "C:/Users/Jason/.local/bin/claude.exe"   # default: `claude` on PATH; required to exist
 bridge_path = ""                                        # default: next to blue-daemon
+start_directory = "~"                                   # where scouting starts (§4.1)
 max_concurrent_sessions = 4
 forward_raw = true
 ```
@@ -456,37 +351,22 @@ forward_raw = true
 Machine token is stored in the OS keyring (`keyring` crate), falling back to a file with
 restricted permissions.
 
-**Internals:**
+If a bridge exits unexpectedly mid-turn, that turn fails; the session's next prompt starts a
+new bridge that resumes the same Claude conversation. Idle bridges are closed after a timeout
+(default 30 min) and resumed the same way on the next prompt.
 
-- `server_conn` — tonic client, open `Attach`, send `Hello`, reconnect with jittered exponential backoff, dispatch
-  commands, drain outbox.
-- `supervisor` — `sessionId → SessionActor`. Each actor owns a bridge child process, its
-  stdin writer, a stdout reader task, current turn, and the `claudeSessionId`.
-- `bridge_proc` — spawn in a Job Object / process group, size-delimited protobuf IO, kill-tree on drop.
-- `translate` — raw `SDKMessage` → events (§5.5); pure function, fixture-tested.
-- `outbox` — SQLite (`sqlx` sqlite): `(session_id, seq, payload)`; append before send,
-  delete on `events.ack`. Also stores `sessions(session_id, claude_session_id)` so a
-  restarted daemon can resume.
-- Recovery: bridge exits unexpectedly mid-turn → emit `turn.failed`; next prompt to that
-  session respawns a bridge with `resume: claudeSessionId`.
-- Idle bridges are closed after a timeout (default 30 min) and transparently resumed on the
-  next prompt.
+### 5.4 Bridge (`bridge/`, exe `claude-bridge`)
 
-### 6.4 Bridge (`bridge/`, exe `claude-bridge`)
-
-- Bun + TypeScript; depends only on `@anthropic-ai/claude-agent-sdk` (pinned exact version) and
-  `@bufbuild/protobuf`.
-- ~200 lines: decode size-delimited `DaemonToBridge` frames from stdin, one `query()` per
-  process, async-iterable input queue for prompts, forward every yielded message as
-  `SdkMessage { json }`, handle `Interrupt`/`Close`, emit `Exited`.
-- Always passes `pathToClaudeCodeExecutable` from `Start.claude_path` (the machine's installed
-  `claude`); a `Start` without it is rejected, so the SDK's bundled copy is never used.
+- Bun + TypeScript; depends on `@anthropic-ai/claude-agent-sdk` (pinned exact version),
+  `@bufbuild/protobuf`, and `zod` (input schema for the scouting tool).
+- Always runs the machine's installed `claude` path that the daemon passes in; it refuses to
+  start a session without one, so the SDK's bundled copy is never used.
 - Built with `bun build --compile` for `bun-windows-x64`, `bun-darwin-arm64`,
   `bun-darwin-x64`, `bun-linux-x64`, `bun-linux-arm64`; shipped next to `blue-daemon`.
-- `--replay <fixture>` mode: emits a recorded stream instead of calling the SDK, for
-  daemon tests and CI without Claude credentials.
+- Replay mode (`BLUE_BRIDGE_REPLAY=<recording>`): plays back recorded turns instead of calling
+  the SDK, for daemon tests and CI without Claude credentials.
 
-### 6.5 Voice agent (`voice/`, Python)
+### 5.5 Voice agent (`voice/`, Python)
 
 - `livekit-agents` with LiveKit's recommended defaults at implementation time (the voice AI
   quickstart: STT/LLM/TTS via LiveKit Inference, Silero VAD, LiveKit turn detector, noise
@@ -496,19 +376,15 @@ restricted permissions.
 - Deployed with `lk agent create` / `lk agent deploy` from `voice/`. Secrets in LiveKit
   Cloud: `BLUE_SERVER_URL`, `BLUE_VOICE_TOKEN`.
 
-**Per-job state:** one `ServerClient` (`grpc.aio` channel to `ClientService`; `Subscribe` stream
-auto-reconnects and resumes from its last cursor), a "focused session" id, and a notification queue.
-
 **Tools** (`@function_tool`):
 
 | Tool | Does |
 |---|---|
 | `list_machines()` | machines and online status |
 | `list_sessions(active_only=True)` | sessions with machine, title, state |
-| `start_task(machine, title, instructions)` | `CreateSession`; the LLM names the session (a few words); focuses it |
-| `send_follow_up(instructions, session=None)` | `SendPrompt` to focused or named session |
-| `get_status(session=None)` | `GetSession`; LLM summarizes the latest activity |
-| `interrupt(session=None)` | `InterruptSession` |
+| `start_task(machine, title, instructions)` | creates a session; the LLM names it (a few words); focuses it |
+| `send_follow_up(instructions, session=None)` | sends a follow-up to the focused or named session |
+| `get_status(session=None)` | fetches the session; the LLM summarizes the latest activity |
 | `focus_session(session)` | change focus by name/title/number |
 
 **Behavior (system prompt essentials):**
@@ -522,28 +398,28 @@ auto-reconnects and resumes from its last cursor), a "focused session" id, and a
 - Acknowledge dispatch in a few words. Never read code, diffs, or paths character by character.
 - Stay silent during progress unless asked.
 
-**Notifications (`notifier.py`):** subscribes to server events. On `TurnCompleted` /
-`TurnFailed` / `MachineStatus{online=false}` with a running session, enqueue a notification.
-When neither the user nor the agent is speaking, deliver it via
-`session.generate_reply(instructions=…)` with the (truncated) `resultText` and the instruction
-to summarize in ≤2 sentences. Multiple pending notifications are coalesced.
+**Notifications:** the agent subscribes to server events. When a turn completes or fails, or a
+machine with a running session goes offline, it queues a notification. When neither the user
+nor the agent is speaking, it delivers it via `session.generate_reply(instructions=…)` with the
+(truncated) result and the instruction to summarize in ≤2 sentences. Multiple pending
+notifications are coalesced.
 
-### 6.6 CLI (`crates/cli`, bin `blue`)
+### 5.6 CLI (`crates/cli`, bin `blue`)
 
-Text client over the same gRPC services (`ClientService` + `AuthService`):
+Text client over the same gRPC services as the voice agent, plus auth:
 
 - `blue login` (GitHub device flow; prints the code and opens github.com/login/device),
   `blue logout`, `blue whoami`; the session token is kept in the OS keyring
 - `blue pair-code`, `blue machines [revoke <name>]`
 - `blue run <machine> "<instructions>" [--title <title>]` (title defaults to the start of the
   instructions) — create session, stream events to terminal
-- `blue send <session> "<instructions>"`, `blue interrupt <session>`, `blue sessions`,
+- `blue send <session> "<instructions>"`, `blue sessions`,
   `blue tail [--session]`
 - `blue token` — print a LiveKit room token (handy with Agents Playground)
 
 ---
 
-## 7. Database bootstrap (external Postgres)
+## 6. Database bootstrap (external Postgres)
 
 Assumption: a reachable Postgres server and an **admin DSN** whose role has `CREATEROLE` and
 `CREATEDB`. Everything else the project creates itself.
@@ -564,7 +440,7 @@ Fallback for providers where databases are created only through their own consol
 
 ---
 
-## 8. Auth and security
+## 7. Auth and security
 
 Permissions are wide open on the machines, so **server auth is the security boundary**.
 
@@ -578,16 +454,16 @@ Permissions are wide open on the machines, so **server auth is the security boun
 - No passwords anywhere. GitHub tokens are used once to read `/user` and never stored.
 - Pairing codes: single-use, 10-minute TTL, hashed at rest.
 - Machine tokens revocable; revocation closes the live connection.
-- Rate limiting on `AuthService.LoginWithGitHub` and `AuthService.ClaimPairingCode`.
+- Rate limiting on GitHub logins and pairing-code claims.
 - TLS everywhere via cert-manager on ingress; daemons refuse plaintext servers except
   `localhost`.
-- No directory restrictions on the machines: Claude starts in the home directory and can work
-  anywhere the OS user can.
+- No directory restrictions on the machines: Claude starts in the project scouting picks
+  (§4.1) and can work anywhere the OS user can.
 - Audit log of logins, pairings, revocations, session creates.
 
 ---
 
-## 9. Kubernetes deployment (Helm chart `deploy/helm/blue-server`)
+## 8. Kubernetes deployment (Helm chart `deploy/helm/blue-server`)
 
 Target: self-run cluster (k3s assumed). Generic enough for others.
 
@@ -665,7 +541,7 @@ helm install blue oci://ghcr.io/<owner>/charts/blue-server \
 
 ---
 
-## 10. Local development
+## 9. Local development
 
 Tooling: Rust (stable, pinned via `rust-toolchain.toml`), Bun, uv, Docker, `just`, `lk` CLI,
 k3d (for chart testing), Helm.
@@ -674,11 +550,14 @@ k3d (for chart testing), Helm.
 |---|---|
 | `just db` | `docker compose up` Postgres 17 with an admin user |
 | `just server` | `blue-server db bootstrap && db migrate && serve` against local Postgres |
-| `just bridge` | `bun build --compile` the bridge into `target/debug/` |
+| `just bridge` | `bun build --compile` the bridge into `target/bridge/` |
 | `just daemon` | `blue-daemon start` against `http://localhost:8080` |
 | `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local server directly (no tunnel needed) |
 | `just proto` | `buf lint` + regenerate TS and Python protocol code (Rust regenerates on build) |
-| `just test` | cargo tests, bridge typecheck + tests, voice tests |
+| `just session` | a Claude session in the terminal via `blue-daemon-test` (`--record` / `--replay`) |
+| `just test` | cargo tests, bridge tests, voice tests |
+| `just test-replay` | daemon ⇄ compiled bridge through a recorded session (no Claude login) |
+| `just test-live` | real Claude sessions (needs a login; Haiku) |
 | `just chart-test` | k3d cluster + in-cluster Postgres + `helm install` + `helm test` |
 
 Frontend during development: LiveKit Agents Playground, connecting with a token from
@@ -686,14 +565,20 @@ Frontend during development: LiveKit Agents Playground, connecting with a token 
 
 ---
 
-## 11. Testing strategy
+## 10. Testing strategy
 
-- **Translation:** recorded raw SDK streams in `bridge/fixtures/*.ndjson` (captured in phase
-  1 from the real `claude`), run through `translate.rs`, snapshot-tested with `insta`.
+- **Translation:** recorded SDK streams in `crates/daemon/tests/fixtures/*.jsonl` (captured from
+  real Claude by the live tests, scrubbed), run through `translate.rs`, snapshot-tested with
+  `insta`. `just record-fixtures` refreshes them; review with `cargo insta review`.
+- **Live (opt-in, needs a Claude login, uses Haiku):** `just test-live` — real sessions through
+  the compiled bridge: scouting, several turns, an edit, resume in a new bridge,
+  and killing the bridge kills Claude and its shells (checked by PID *and* start time, since
+  Windows reuses PIDs).
 - **Protocol:** `buf lint`; framing round-trip tests in Rust and TS; Python import/round-trip
   test; generated-code freshness check in CI; cross-language handshake (daemon ⇄ compiled bridge).
-- **Daemon:** integration tests using `claude-bridge --replay` — multi-turn, interrupt, bridge
-  crash + resume, outbox replay after a dropped server connection.
+- **Daemon:** `just test-replay` (in CI on Linux, macOS and Windows) — the daemon driving the
+  compiled bridge in replay mode through a recorded multi-turn session. Phase 2
+  adds outbox replay after a dropped server connection.
 - **Server:** integration tests against real Postgres (`testcontainers`), with an in-process fake
   daemon and fake client over real gRPC streams: routing, dedupe, turn queueing, reconnect
   reconciliation, auth failures.
@@ -711,7 +596,7 @@ scope now.
 
 ---
 
-## 12. CI/CD (GitHub Actions)
+## 11. CI/CD (GitHub Actions)
 
 - **ci.yml** (PRs + main): `cargo fmt --check`, `clippy -D warnings`, `cargo test` (with
   Postgres service), bridge `tsc --noEmit` + tests, voice `ruff` + `pyright` + `pytest`,
@@ -728,20 +613,27 @@ One version number for the whole repo.
 
 ---
 
-## 13. Phases and exit criteria
+## 12. Phases and exit criteria
 
 **Phase 0 — Scaffold**
 Cargo workspace, `proto/` with the v1 definitions, codegen for Rust/TS/Python, `bridge/`
 (bun) answering the protobuf handshake, `voice/` (uv) skeleton, `justfile`, CI, GitHub repo.
 *Exit:* `just test` and CI pass; `blue-daemon doctor` spawns the bun-compiled bridge and gets a
-`Ready` frame over protobuf; `blue health` gets SERVING from `blue-server serve`.
+ready frame over protobuf; `blue health` gets SERVING from `blue-server serve`.
 
-**Phase 1 — Daemon ⇄ bridge on Windows (riskiest first)**
-Bridge implemented; Rust spawns it, runs a multi-turn session in a scratch repo, interrupts,
-kills mid-turn, resumes with `claudeSessionId`. Verify `bun build --compile` works with the
+**Phase 1 — Daemon ⇄ bridge on Windows (riskiest first)** ✅ *done*
+Bridge implemented; Rust spawns it, runs a multi-turn session in a scratch repo, kills
+mid-turn, resumes with the Claude session id. Verify `bun build --compile` works with the
 SDK and an explicit `pathToClaudeCodeExecutable`. Record fixtures. Implement `translate.rs`.
-*Exit:* a Rust test binary drives three turns + interrupt + resume against real `claude`;
+*Exit:* a Rust test binary drives three turns + resume against real `claude`;
 translation snapshot tests pass on fixtures; process-tree kill verified on Windows.
+*Result:* all met (`just test-live`, `just test-replay`, snapshot tests). Also added: scouting
+for the working directory (§4.1), and replay mode in CI. Sessions are a library API
+(`blue_daemon::session`, used by the tests and, from phase 2, the server connection); the
+`blue-daemon` binary only exposes `doctor` so far. For trying sessions by hand there is a
+separate, unshipped tool: `blue-daemon-test session [--cwd DIR] [--resume ID] [--model M]
+[--record FILE | --replay FILE]` (`just session`), a Claude session in the terminal where each
+line is a prompt and `/quit` ends it.
 
 **Phase 2 — Server, protocol, daemon, CLI (local)**
 Protocols in `crates/protocol`; server with Postgres, bootstrap, migrations, auth, pairing,
@@ -752,7 +644,7 @@ killing the server or the daemon mid-task loses no events.
 **Phase 3 — Voice agent (local worker)**
 Agent with tools, server client, notifier, system prompt; LiveKit Cloud project; Agents
 Playground with a server-minted token.
-*Exit:* by voice alone: start a task, ask status, follow up, interrupt, get a spoken completion
+*Exit:* by voice alone: start a task, ask status, follow up, get a spoken completion
 summary.
 
 **Phase 4 — Helm chart**
@@ -778,7 +670,7 @@ Technology decided then.
 
 ---
 
-## 14. Risks
+## 13. Risks
 
 | Risk | Mitigation |
 |---|---|
@@ -789,11 +681,11 @@ Technology decided then.
 | Allow-all permissions, work anywhere, remote voice | Strong server auth; per-machine tokens; audit log |
 | Voice talks over me / interrupts at bad times | Notifications only when both sides are quiet; coalescing; LiveKit turn detection |
 | Hosted Postgres disallows `CREATE DATABASE` | Manual `bootstrap.sql` path with bootstrap disabled |
-| `claude` not logged in on a machine | `blue-daemon doctor` checks; surfaced as `turn.failed` with a clear reason |
+| `claude` not logged in on a machine | `blue-daemon doctor` checks; surfaced as a failed turn with a clear reason |
 
 ---
 
-## 15. Open questions (none block phases 0–3)
+## 14. Open questions (none block phases 0–3)
 
 1. ~~GitHub repo~~ — `u9g/blue` (public).
 2. A GitHub OAuth App for sign-in (github.com/settings/developers → New OAuth App, enable

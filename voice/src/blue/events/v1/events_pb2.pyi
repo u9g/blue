@@ -22,7 +22,7 @@ SESSION_STATE_CLOSED: SessionState
 SESSION_STATE_FAILED: SessionState
 
 class SessionEvent(_message.Message):
-    __slots__ = ("session_started", "turn_started", "assistant_text", "tool_started", "tool_finished", "turn_completed", "turn_failed", "turn_interrupted", "session_state_changed", "raw_sdk_message")
+    __slots__ = ("session_started", "turn_started", "assistant_text", "tool_started", "tool_finished", "turn_completed", "turn_failed", "session_state_changed", "raw_sdk_message")
     SESSION_STARTED_FIELD_NUMBER: _ClassVar[int]
     TURN_STARTED_FIELD_NUMBER: _ClassVar[int]
     ASSISTANT_TEXT_FIELD_NUMBER: _ClassVar[int]
@@ -30,7 +30,6 @@ class SessionEvent(_message.Message):
     TOOL_FINISHED_FIELD_NUMBER: _ClassVar[int]
     TURN_COMPLETED_FIELD_NUMBER: _ClassVar[int]
     TURN_FAILED_FIELD_NUMBER: _ClassVar[int]
-    TURN_INTERRUPTED_FIELD_NUMBER: _ClassVar[int]
     SESSION_STATE_CHANGED_FIELD_NUMBER: _ClassVar[int]
     RAW_SDK_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     session_started: SessionStarted
@@ -40,10 +39,9 @@ class SessionEvent(_message.Message):
     tool_finished: ToolFinished
     turn_completed: TurnCompleted
     turn_failed: TurnFailed
-    turn_interrupted: TurnInterrupted
     session_state_changed: SessionStateChanged
     raw_sdk_message: RawSdkMessage
-    def __init__(self, session_started: _Optional[_Union[SessionStarted, _Mapping]] = ..., turn_started: _Optional[_Union[TurnStarted, _Mapping]] = ..., assistant_text: _Optional[_Union[AssistantText, _Mapping]] = ..., tool_started: _Optional[_Union[ToolStarted, _Mapping]] = ..., tool_finished: _Optional[_Union[ToolFinished, _Mapping]] = ..., turn_completed: _Optional[_Union[TurnCompleted, _Mapping]] = ..., turn_failed: _Optional[_Union[TurnFailed, _Mapping]] = ..., turn_interrupted: _Optional[_Union[TurnInterrupted, _Mapping]] = ..., session_state_changed: _Optional[_Union[SessionStateChanged, _Mapping]] = ..., raw_sdk_message: _Optional[_Union[RawSdkMessage, _Mapping]] = ...) -> None: ...
+    def __init__(self, session_started: _Optional[_Union[SessionStarted, _Mapping]] = ..., turn_started: _Optional[_Union[TurnStarted, _Mapping]] = ..., assistant_text: _Optional[_Union[AssistantText, _Mapping]] = ..., tool_started: _Optional[_Union[ToolStarted, _Mapping]] = ..., tool_finished: _Optional[_Union[ToolFinished, _Mapping]] = ..., turn_completed: _Optional[_Union[TurnCompleted, _Mapping]] = ..., turn_failed: _Optional[_Union[TurnFailed, _Mapping]] = ..., session_state_changed: _Optional[_Union[SessionStateChanged, _Mapping]] = ..., raw_sdk_message: _Optional[_Union[RawSdkMessage, _Mapping]] = ...) -> None: ...
 
 class SessionStarted(_message.Message):
     __slots__ = ("claude_session_id", "model", "cwd")
@@ -86,18 +84,16 @@ class ToolFinished(_message.Message):
     def __init__(self, tool_use_id: _Optional[str] = ..., is_error: _Optional[bool] = ...) -> None: ...
 
 class TurnCompleted(_message.Message):
-    __slots__ = ("turn_id", "result_text", "duration_ms", "num_turns", "cost_usd")
+    __slots__ = ("turn_id", "result_text", "duration_ms", "num_turns")
     TURN_ID_FIELD_NUMBER: _ClassVar[int]
     RESULT_TEXT_FIELD_NUMBER: _ClassVar[int]
     DURATION_MS_FIELD_NUMBER: _ClassVar[int]
     NUM_TURNS_FIELD_NUMBER: _ClassVar[int]
-    COST_USD_FIELD_NUMBER: _ClassVar[int]
     turn_id: str
     result_text: str
     duration_ms: int
     num_turns: int
-    cost_usd: float
-    def __init__(self, turn_id: _Optional[str] = ..., result_text: _Optional[str] = ..., duration_ms: _Optional[int] = ..., num_turns: _Optional[int] = ..., cost_usd: _Optional[float] = ...) -> None: ...
+    def __init__(self, turn_id: _Optional[str] = ..., result_text: _Optional[str] = ..., duration_ms: _Optional[int] = ..., num_turns: _Optional[int] = ...) -> None: ...
 
 class TurnFailed(_message.Message):
     __slots__ = ("turn_id", "reason")
@@ -106,12 +102,6 @@ class TurnFailed(_message.Message):
     turn_id: str
     reason: str
     def __init__(self, turn_id: _Optional[str] = ..., reason: _Optional[str] = ...) -> None: ...
-
-class TurnInterrupted(_message.Message):
-    __slots__ = ("turn_id",)
-    TURN_ID_FIELD_NUMBER: _ClassVar[int]
-    turn_id: str
-    def __init__(self, turn_id: _Optional[str] = ...) -> None: ...
 
 class SessionStateChanged(_message.Message):
     __slots__ = ("state",)

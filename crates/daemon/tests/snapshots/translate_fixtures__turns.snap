@@ -1,0 +1,17 @@
+---
+source: crates/daemon/tests/translate_fixtures.rs
+expression: "translate_fixture(\"turns\")"
+---
+SessionStarted model=claude-haiku-5-5 cwd=<HOME>\AppData\Local\Temp\.tmpOaIUZl\calc
+ToolStarted Grep "Grep ^\\s*def\\s+\\w+"
+ToolFinished is_error=false
+AssistantText "add"
+TurnCompleted t1 num_turns=2 result="add"
+ToolStarted Read "Read calc.py"
+ToolFinished is_error=false
+ToolStarted Edit "Edit calc.py"
+ToolFinished is_error=false
+AssistantText "I added `subtract(a, b)` to `calc.py`, returning `a - b`, below `add`. I haven't committed."
+TurnCompleted t2 num_turns=3 result="I added `subtract(a, b)` to `calc.py`, returning `a - b`, below `add`. I haven't committed."
+AssistantText "ok"
+TurnCompleted t3 num_turns=1 result="ok"

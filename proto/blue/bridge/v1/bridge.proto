@@ -12,8 +12,7 @@ message DaemonToBridge {
   oneof command {
     Start start = 1;
     Prompt prompt = 2;
-    Interrupt interrupt = 3;
-    Close close = 4;
+    Close close = 3;
   }
 }
 
@@ -26,8 +25,14 @@ message BridgeToDaemon {
   }
 }
 
-// Starts the Agent SDK query. Must be the first command, sent once.
-// Claude always starts in the user's home directory and may work anywhere on the machine.
+// Starts a session. Must be the first command, sent once.
+//
+// New session (no resume id): the bridge waits for the first Prompt, then runs a short scouting
+// query in `cwd` that picks the project directory the request is about, and starts the real
+// session there. Claude may still work anywhere on the machine.
+//
+// Resumed session: the bridge starts the real session directly in `cwd`, which must be the
+// directory the session originally ran in (Claude Code stores sessions per directory).
 message Start {
   string session_id = 1;
   // Absolute path to the machine's installed `claude`, resolved by the daemon and passed to the
@@ -37,6 +42,9 @@ message Start {
   // Claude session id to resume, if continuing an existing conversation.
   optional string resume_claude_session_id = 3;
   optional string model = 4;
+  // Absolute directory: where scouting starts for a new session, or the session's own
+  // directory when resuming. Required.
+  string cwd = 5;
 }
 
 // Sends one user turn into the running query.
@@ -45,9 +53,6 @@ message Start {
 message Prompt {
   string text = 1;
 }
-
-// Interrupts the current turn (query.interrupt()).
-message Interrupt {}
 
 // Ends the input stream; the bridge finishes and exits 0.
 message Close {}

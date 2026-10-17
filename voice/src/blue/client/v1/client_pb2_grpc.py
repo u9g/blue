@@ -56,11 +56,6 @@ class ClientServiceStub:
                 request_serializer=blue_dot_client_dot_v1_dot_client__pb2.SendPromptRequest.SerializeToString,
                 response_deserializer=blue_dot_client_dot_v1_dot_client__pb2.SendPromptResponse.FromString,
                 _registered_method=True)
-        self.InterruptSession = channel.unary_unary(
-                '/blue.client.v1.ClientService/InterruptSession',
-                request_serializer=blue_dot_client_dot_v1_dot_client__pb2.InterruptSessionRequest.SerializeToString,
-                response_deserializer=blue_dot_client_dot_v1_dot_client__pb2.InterruptSessionResponse.FromString,
-                _registered_method=True)
         self.GetSession = channel.unary_unary(
                 '/blue.client.v1.ClientService/GetSession',
                 request_serializer=blue_dot_client_dot_v1_dot_client__pb2.GetSessionRequest.SerializeToString,
@@ -104,12 +99,6 @@ class ClientServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def InterruptSession(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def GetSession(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -145,11 +134,6 @@ def add_ClientServiceServicer_to_server(servicer, server):
                     servicer.SendPrompt,
                     request_deserializer=blue_dot_client_dot_v1_dot_client__pb2.SendPromptRequest.FromString,
                     response_serializer=blue_dot_client_dot_v1_dot_client__pb2.SendPromptResponse.SerializeToString,
-            ),
-            'InterruptSession': grpc.unary_unary_rpc_method_handler(
-                    servicer.InterruptSession,
-                    request_deserializer=blue_dot_client_dot_v1_dot_client__pb2.InterruptSessionRequest.FromString,
-                    response_serializer=blue_dot_client_dot_v1_dot_client__pb2.InterruptSessionResponse.SerializeToString,
             ),
             'GetSession': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSession,
@@ -272,33 +256,6 @@ class ClientService:
             '/blue.client.v1.ClientService/SendPrompt',
             blue_dot_client_dot_v1_dot_client__pb2.SendPromptRequest.SerializeToString,
             blue_dot_client_dot_v1_dot_client__pb2.SendPromptResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def InterruptSession(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/blue.client.v1.ClientService/InterruptSession',
-            blue_dot_client_dot_v1_dot_client__pb2.InterruptSessionRequest.SerializeToString,
-            blue_dot_client_dot_v1_dot_client__pb2.InterruptSessionResponse.FromString,
             options,
             channel_credentials,
             insecure,

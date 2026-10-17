@@ -1,16 +1,11 @@
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{Context, bail};
-use blue_protocol::PROTOCOL_VERSION;
-use blue_protocol::bridge::v1::{
-    BridgeToDaemon, Close, DaemonToBridge, Ready, bridge_to_daemon, daemon_to_bridge,
-};
-use blue_protocol::framing::{read_frame, write_frame};
-use tokio::io::{AsyncRead, BufReader};
-use tokio::process::Command;
+use blue_protocol::bridge::v1::{Close, Ready, bridge_to_daemon, daemon_to_bridge};
 use tokio::time::timeout;
+
+use crate::bridge_proc::BridgeProcess;
 
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -60,50 +55,22 @@ pub async fn run(bridge: &Path, claude: Option<&Path>) -> anyhow::Result<()> {
 }
 
 /// Spawns the bridge, waits for `Ready`, then asks it to exit with `Close`.
-async fn bridge_handshake(bridge: &Path) -> anyhow::Result<Ready> {
-    let mut child = Command::new(bridge)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()
-        .with_context(|| format!("spawn bridge {}", bridge.display()))?;
-    let mut stdin = child.stdin.take().context("bridge stdin")?;
-    let mut stdout = BufReader::new(child.stdout.take().context("bridge stdout")?);
-
-    let ready = match next_event(&mut stdout).await? {
-        bridge_to_daemon::Event::Ready(ready) => ready,
-        other => bail!("expected Ready as the bridge's first frame, got {other:?}"),
-    };
-    if ready.protocol_version != PROTOCOL_VERSION {
-        bail!(
-            "bridge speaks protocol v{}, daemon speaks v{PROTOCOL_VERSION}",
-            ready.protocol_version
-        );
-    }
-
-    let close = DaemonToBridge {
-        command: Some(daemon_to_bridge::Command::Close(Close {})),
-    };
-    write_frame(&mut stdin, &close).await?;
-    match next_event(&mut stdout).await? {
+async fn bridge_handshake(path: &Path) -> anyhow::Result<Ready> {
+    let (mut bridge, ready) = BridgeProcess::spawn(path).await?;
+    bridge
+        .send(daemon_to_bridge::Command::Close(Close {}))
+        .await?;
+    match bridge
+        .next_event()
+        .await
+        .context("bridge closed stdout")??
+    {
         bridge_to_daemon::Event::Exited(exited) if exited.error.is_empty() => {}
         other => bail!("expected a clean Exited after Close, got {other:?}"),
     }
-
-    let status = child.wait().await?;
+    let status = bridge.wait().await?;
     if !status.success() {
         bail!("bridge exited with {status}");
     }
     Ok(ready)
-}
-
-async fn next_event<R: AsyncRead + Unpin>(
-    stdout: &mut R,
-) -> anyhow::Result<bridge_to_daemon::Event> {
-    read_frame::<_, BridgeToDaemon>(stdout)
-        .await?
-        .context("bridge closed stdout")?
-        .event
-        .context("bridge sent an empty frame")
 }

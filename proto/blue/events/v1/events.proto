@@ -23,9 +23,8 @@ message SessionEvent {
     ToolFinished tool_finished = 5;
     TurnCompleted turn_completed = 6;
     TurnFailed turn_failed = 7;
-    TurnInterrupted turn_interrupted = 8;
-    SessionStateChanged session_state_changed = 9;
-    RawSdkMessage raw_sdk_message = 10;
+    SessionStateChanged session_state_changed = 8;
+    RawSdkMessage raw_sdk_message = 9;
   }
 }
 
@@ -63,16 +62,11 @@ message TurnCompleted {
   string result_text = 2;
   uint64 duration_ms = 3;
   uint32 num_turns = 4;
-  optional double cost_usd = 5;
 }
 
 message TurnFailed {
   string turn_id = 1;
   string reason = 2;
-}
-
-message TurnInterrupted {
-  string turn_id = 1;
 }
 
 message SessionStateChanged {
