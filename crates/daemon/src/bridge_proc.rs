@@ -32,14 +32,9 @@ pub struct BridgeProcess {
 }
 
 impl BridgeProcess {
-    /// Starts the bridge and waits for its `Ready` frame.
-    pub async fn spawn(path: &Path) -> anyhow::Result<(Self, Ready)> {
-        Self::spawn_with(path, None).await
-    }
-
-    /// Like `spawn`, but in replay mode when `replay` is set: the bridge plays back that
-    /// recording instead of running Claude.
-    pub async fn spawn_with(path: &Path, replay: Option<&Path>) -> anyhow::Result<(Self, Ready)> {
+    /// Starts the bridge and waits for its `Ready` frame. With `replay`, the bridge plays back
+    /// that recording instead of running Claude.
+    pub async fn spawn(path: &Path, replay: Option<&Path>) -> anyhow::Result<(Self, Ready)> {
         let mut command = Command::new(path);
         if let Some(recording) = replay {
             command.env("BLUE_BRIDGE_REPLAY", recording);

@@ -3,7 +3,7 @@
 
 import { query, type Query, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { Start } from "./gen/blue/bridge/v1/bridge_pb.ts";
-import { log, send } from "./io.ts";
+import { log, send, sendError } from "./io.ts";
 import { AsyncQueue } from "./queue.ts";
 import { scoutProjectDirectory } from "./scout.ts";
 import { baseOptions, userMessage } from "./sdk.ts";
@@ -53,10 +53,7 @@ export class Session implements BridgeSession {
       log(`project directory: ${chosen}`);
       return chosen;
     }
-    await send({
-      case: "error",
-      value: { message: `Couldn't pick a project directory; working in ${cwd}.` },
-    });
+    await sendError(`Couldn't pick a project directory; working in ${cwd}.`);
     return cwd;
   }
 

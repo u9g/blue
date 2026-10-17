@@ -7,6 +7,8 @@
 //! Every run records its sessions (scrubbed) to target/fixtures/. The bridge comes from
 //! BLUE_BRIDGE_PATH, else target/bridge/ (built by `just bridge`).
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -14,21 +16,10 @@ use blue_daemon::claude;
 use blue_daemon::recorder::Recorder;
 use blue_daemon::session::{Session, SessionConfig};
 use blue_protocol::events::v1::{SessionState, session_event::Kind};
+use common::{bridge_path, close, completed_turn, until};
 use sysinfo::{Pid, ProcessesToUpdate, System};
-use tokio::time::timeout;
 
 const MODEL: &str = "haiku";
-const TURN_TIMEOUT: Duration = Duration::from_secs(180);
-
-fn bridge_path() -> PathBuf {
-    std::env::var_os("BLUE_BRIDGE_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../target/bridge")
-                .join(format!("claude-bridge{}", std::env::consts::EXE_SUFFIX))
-        })
-}
 
 /// A scratch directory holding two small git repos, so scouting has to choose.
 fn scratch() -> tempfile::TempDir {
@@ -83,56 +74,6 @@ async fn start(cwd: &Path, resume: Option<String>, fixture: &str) -> Session {
     std::fs::create_dir_all(&recordings).unwrap();
     session.record_to(Recorder::create(&recordings.join(format!("{fixture}.jsonl"))).unwrap());
     session
-}
-
-/// Collects events until one matches `done`, which is returned last.
-async fn until(session: &mut Session, done: impl Fn(&Kind) -> bool) -> Vec<Kind> {
-    let mut seen = Vec::new();
-    timeout(TURN_TIMEOUT, async {
-        while let Some(event) = session.next().await {
-            let Some(kind) = event.event.and_then(|e| e.kind) else {
-                continue;
-            };
-            let stop = done(&kind);
-            seen.push(kind);
-            if stop {
-                return;
-            }
-        }
-        panic!("session ended early: {seen:#?}");
-    })
-    .await
-    .unwrap_or_else(|_| panic!("timed out; saw {seen:#?}"));
-    seen
-}
-
-fn turn_ended(kind: &Kind) -> bool {
-    matches!(kind, Kind::TurnCompleted(_) | Kind::TurnFailed(_))
-}
-
-async fn completed_turn(session: &mut Session, turn: &str, text: &str) -> String {
-    session.prompt(turn.into(), text.into()).await.unwrap();
-    let events = until(session, turn_ended).await;
-    match events.last() {
-        Some(Kind::TurnCompleted(done)) => {
-            assert_eq!(done.turn_id, turn);
-            done.result_text.clone()
-        }
-        other => panic!("turn {turn} did not complete: {other:#?}\n{events:#?}"),
-    }
-}
-
-async fn close(mut session: Session) {
-    session.close().await.unwrap();
-    let events = until(
-        &mut session,
-        |kind| matches!(kind, Kind::SessionStateChanged(s) if s.state() != SessionState::Idle),
-    )
-    .await;
-    assert!(
-        matches!(events.last(), Some(Kind::SessionStateChanged(s)) if s.state() == SessionState::Closed),
-        "{events:#?}"
-    );
 }
 
 #[tokio::test]

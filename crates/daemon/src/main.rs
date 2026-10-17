@@ -1,6 +1,4 @@
-use std::path::PathBuf;
-
-use blue_daemon::doctor;
+use blue_daemon::doctor::{self, ExecutablePaths};
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
@@ -18,14 +16,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Check that the bridge and `claude` are usable from this machine.
-    Doctor {
-        /// Path to the claude-bridge executable. Defaults to the one next to blue-daemon.
-        #[arg(long, env = "BLUE_BRIDGE_PATH")]
-        bridge: Option<PathBuf>,
-        /// Path to the installed `claude` executable. Defaults to `claude` on PATH.
-        #[arg(long, env = "BLUE_CLAUDE_PATH")]
-        claude: Option<PathBuf>,
-    },
+    Doctor(ExecutablePaths),
 }
 
 #[tokio::main]
@@ -36,12 +27,6 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     match Cli::parse().command {
-        Command::Doctor { bridge, claude } => {
-            let bridge = match bridge {
-                Some(path) => path,
-                None => doctor::default_bridge_path()?,
-            };
-            doctor::run(&bridge, claude.as_deref()).await
-        }
+        Command::Doctor(paths) => doctor::run(&paths.bridge()?, paths.claude.as_deref()).await,
     }
 }

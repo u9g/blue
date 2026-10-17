@@ -47,7 +47,7 @@ impl Session {
     /// Starts the bridge and sends `Start`. Claude itself starts with the first prompt.
     pub async fn start(config: SessionConfig) -> anyhow::Result<Self> {
         let (mut bridge, _ready) =
-            BridgeProcess::spawn_with(&config.bridge_path, config.replay.as_deref()).await?;
+            BridgeProcess::spawn(&config.bridge_path, config.replay.as_deref()).await?;
         let start = Start {
             session_id: config.session_id.clone(),
             claude_path: path_string(config.claude_path)?,
@@ -107,14 +107,9 @@ impl Session {
         self.bridge
             .send(daemon_to_bridge::Command::Prompt(Prompt { text }))
             .await?;
-        self.emit(
-            &turn_id,
-            Kind::TurnStarted(TurnStarted {
-                turn_id: turn_id.clone(),
-            }),
-        );
+        self.turn = Some(turn_id.clone());
+        self.emit(Kind::TurnStarted(TurnStarted { turn_id }));
         self.state(SessionState::Running);
-        self.turn = Some(turn_id);
         Ok(())
     }
 
@@ -164,11 +159,9 @@ impl Session {
         if let Some(recorder) = &mut self.recorder {
             recorder.record(json);
         }
-        for event in self.translator.translate(json, self.turn.as_deref()) {
-            let Some(kind) = event.kind else { continue };
-            let ends_turn = matches!(kind, Kind::TurnCompleted(_) | Kind::TurnFailed(_));
-            let turn_id = self.turn.clone().unwrap_or_default();
-            self.emit(&turn_id, kind);
+        for kind in self.translator.translate(json, self.turn.as_deref()) {
+            let ends_turn = kind.ends_turn();
+            self.emit(kind);
             if ends_turn {
                 self.turn = None;
                 self.state(SessionState::Idle);
@@ -195,14 +188,9 @@ impl Session {
             if !stderr.is_empty() {
                 reason = format!("{reason}\n{stderr}");
             }
-            if let Some(turn_id) = self.turn.take() {
-                self.emit(
-                    &turn_id,
-                    Kind::TurnFailed(TurnFailed {
-                        turn_id: turn_id.clone(),
-                        reason,
-                    }),
-                );
+            if let Some(turn_id) = self.turn.clone() {
+                self.emit(Kind::TurnFailed(TurnFailed { turn_id, reason }));
+                self.turn = None;
             } else {
                 tracing::warn!(session = %self.id, "bridge exited: {reason}");
             }
@@ -212,21 +200,18 @@ impl Session {
     }
 
     fn state(&mut self, state: SessionState) {
-        let turn_id = self.turn.clone().unwrap_or_default();
-        self.emit(
-            &turn_id,
-            Kind::SessionStateChanged(SessionStateChanged {
-                state: state.into(),
-            }),
-        );
+        self.emit(Kind::SessionStateChanged(SessionStateChanged {
+            state: state.into(),
+        }));
     }
 
-    fn emit(&mut self, turn_id: &str, kind: Kind) {
+    /// Queues an event for the turn in progress, if any.
+    fn emit(&mut self, kind: Kind) {
         self.seq += 1;
         self.pending.push_back(DaemonEvent {
             session_id: self.id.clone(),
             seq: self.seq,
-            turn_id: turn_id.to_owned(),
+            turn_id: self.turn.clone().unwrap_or_default(),
             occurred_at: Some(SystemTime::now().into()),
             event: Some(SessionEvent { kind: Some(kind) }),
         });

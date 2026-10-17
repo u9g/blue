@@ -4,8 +4,8 @@
 //! don't use are ignored, and unknown message types produce no events.
 
 use blue_protocol::events::v1::{
-    AssistantText, SessionEvent, SessionStarted, ToolFinished, ToolStarted, TurnCompleted,
-    TurnFailed, session_event::Kind,
+    AssistantText, SessionStarted, ToolFinished, ToolStarted, TurnCompleted, TurnFailed,
+    session_event::Kind,
 };
 use serde_json::Value;
 
@@ -27,12 +27,12 @@ impl Translator {
     }
 
     /// Translates one SDK message. `turn_id` is the turn in progress, if any.
-    pub fn translate(&mut self, json: &str, turn_id: Option<&str>) -> Vec<SessionEvent> {
+    pub fn translate(&mut self, json: &str, turn_id: Option<&str>) -> Vec<Kind> {
         let Ok(message) = serde_json::from_str::<Value>(json) else {
             tracing::warn!("bridge sent an SDK message that isn't JSON");
             return Vec::new();
         };
-        let kinds = match str_field(&message, "type") {
+        match str_field(&message, "type") {
             "system" if str_field(&message, "subtype") == "init" => self.init(&message),
             // Messages from subagents carry the Task tool call they belong to; only the main
             // conversation is reported.
@@ -40,11 +40,7 @@ impl Translator {
             "user" if message["parent_tool_use_id"].is_null() => tool_results(&message),
             "result" => self.result(&message, turn_id),
             _ => Vec::new(),
-        };
-        kinds
-            .into_iter()
-            .map(|kind| SessionEvent { kind: Some(kind) })
-            .collect()
+        }
     }
 
     fn init(&mut self, message: &Value) -> Vec<Kind> {
@@ -192,11 +188,7 @@ mod tests {
     use serde_json::json;
 
     fn kinds(translator: &mut Translator, message: Value, turn: Option<&str>) -> Vec<Kind> {
-        translator
-            .translate(&message.to_string(), turn)
-            .into_iter()
-            .filter_map(|event| event.kind)
-            .collect()
+        translator.translate(&message.to_string(), turn)
     }
 
     #[test]

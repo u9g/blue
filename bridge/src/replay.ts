@@ -4,7 +4,7 @@
 // Used to test the daemon end to end without Claude.
 
 import { readFileSync } from "node:fs";
-import { send } from "./io.ts";
+import { send, sendError } from "./io.ts";
 import type { BridgeSession } from "./session.ts";
 
 export class ReplaySession implements BridgeSession {
@@ -26,10 +26,7 @@ export class ReplaySession implements BridgeSession {
   prompt(_text: string): void {
     const turn = this.turns.shift();
     this.playing = this.playing.then(async () => {
-      if (!turn) {
-        await send({ case: "error", value: { message: "replay has no more recorded turns" } });
-        return;
-      }
+      if (!turn) return sendError("replay has no more recorded turns");
       for (const json of turn) await send({ case: "sdkMessage", value: { json } });
     });
   }

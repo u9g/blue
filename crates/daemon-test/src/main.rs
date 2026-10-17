@@ -4,9 +4,10 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use blue_daemon::claude;
+use blue_daemon::doctor::ExecutablePaths;
 use blue_daemon::recorder::Recorder;
 use blue_daemon::session::{Session, SessionConfig};
-use blue_daemon::{claude, doctor};
 use blue_protocol::events::v1::{SessionState, session_event::Kind};
 use clap::{Parser, Subcommand};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -28,12 +29,8 @@ enum Command {
     /// Run a Claude session in this terminal, without a server. Each line you type is a prompt;
     /// `/quit` ends the session once the running turn finishes.
     Session {
-        /// Path to the claude-bridge executable. Defaults to the one next to this binary.
-        #[arg(long, env = "BLUE_BRIDGE_PATH")]
-        bridge: Option<PathBuf>,
-        /// Path to the installed `claude` executable. Defaults to `claude` on PATH.
-        #[arg(long, env = "BLUE_CLAUDE_PATH")]
-        claude: Option<PathBuf>,
+        #[command(flatten)]
+        paths: ExecutablePaths,
         /// Where Claude looks for the project (or, with --resume, the session's own directory).
         /// Defaults to the home directory.
         #[arg(long)]
@@ -63,8 +60,7 @@ async fn main() -> anyhow::Result<()> {
 
     match Cli::parse().command {
         Command::Session {
-            bridge,
-            claude,
+            paths,
             cwd,
             resume,
             model,
@@ -73,8 +69,8 @@ async fn main() -> anyhow::Result<()> {
         } => {
             // Replay never runs Claude, so it doesn't need it installed.
             let claude_path = match &replay {
-                Some(_) => claude.unwrap_or_else(|| "claude".into()),
-                None => claude::resolve(claude.as_deref()).await?.path,
+                Some(_) => paths.claude.clone().unwrap_or_else(|| "claude".into()),
+                None => claude::resolve(paths.claude.as_deref()).await?.path,
             };
             let cwd = match cwd {
                 Some(cwd) => std::path::absolute(cwd)?,
@@ -82,10 +78,7 @@ async fn main() -> anyhow::Result<()> {
             };
             let mut session = Session::start(SessionConfig {
                 session_id: "local".into(),
-                bridge_path: match bridge {
-                    Some(path) => path,
-                    None => doctor::default_bridge_path()?,
-                },
+                bridge_path: paths.bridge()?,
                 claude_path,
                 cwd,
                 resume_claude_session_id: resume,
@@ -123,7 +116,7 @@ async fn interactive(mut session: Session) -> anyhow::Result<()> {
             },
             event = session.next() => {
                 let Some(event) = event else { break };
-                let Some(kind) = event.event.and_then(|event| event.kind) else { continue };
+                let Some(kind) = event.into_kind() else { continue };
                 print_event(kind);
             }
         }
