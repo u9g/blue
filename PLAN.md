@@ -206,7 +206,7 @@ the standard "size-delimited" format (`prost::Message::encode_length_delimited` 
 `sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`).
 
 - Daemon → bridge: `BridgeInput { oneof command { Start, Prompt, Interrupt, Close } }`
-  - `Start { session_id, claude_path, resume_claude_session_id?, model?, include_partial_messages }`
+  - `Start { session_id, claude_path, resume_claude_session_id?, model? }`
   - `Prompt { turn_id, text }`
   - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
 - Bridge → daemon: `BridgeOutput { oneof event { Ready, SdkMessage, Error, Exited } }`
@@ -217,9 +217,11 @@ the standard "size-delimited" format (`prost::Message::encode_length_delimited` 
   - `Error { message, fatal }`, `Exited { code }`
 
 Bridge behavior: `query({ prompt: asyncIterableOfUserMessages, options: { cwd: os.homedir(), resume,
-permissionMode: "bypassPermissions", pathToClaudeCodeExecutable: claudePath, model,
-includePartialMessages } })`. `Interrupt` → `q.interrupt()`. `Close` or stdin EOF ends the
-input iterable so the query finishes cleanly.
+permissionMode: "bypassPermissions", pathToClaudeCodeExecutable: claudePath, model } })`.
+`Interrupt` → `q.interrupt()`. `Close` or stdin EOF ends the input iterable so the query finishes
+cleanly. Partial messages (`includePartialMessages`, token-by-token `stream_event`s) stay off:
+nothing consumes them, and voice only needs finished steps. If a web UI wants live typing later,
+it's one additive field on `Start`.
 
 **Working directory.** Claude always starts in the user's home directory and can work anywhere
 the OS user can. There is no project list; the instructions say which repo or directory to work
@@ -348,8 +350,7 @@ tested against recorded fixtures). `SessionEvent` is a `oneof`:
 | `RawSdkMessage` | every SDK message (if `forward_raw`) | `json` |
 
 `MachineStatus { machine_id, online }` is produced by the server, not the daemon, and lives in
-`blue.client.v1.Event`. Partial stream events (`stream_event`) are only forwarded as
-`RawSdkMessage`. Unknown SDK message types are logged and forwarded raw, never fatal.
+`blue.client.v1.Event`. Unknown SDK message types are logged and forwarded raw, never fatal.
 
 ---
 

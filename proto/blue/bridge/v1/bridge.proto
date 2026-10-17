@@ -39,7 +39,6 @@ message Start {
   // Claude session id to resume, if continuing an existing conversation.
   optional string resume_claude_session_id = 3;
   optional string model = 4;
-  bool include_partial_messages = 5;
 }
 
 // Sends one user turn into the running query.
