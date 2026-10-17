@@ -13,7 +13,7 @@ enum SessionState {
 }
 
 // A session event, produced by the daemon by translating raw Agent SDK messages.
-// Shared by the daemon, the hub, and every client.
+// Shared by the daemon, the server, and every client.
 message SessionEvent {
   oneof kind {
     SessionStarted session_started = 1;

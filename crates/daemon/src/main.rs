@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "blue-daemon",
     version,
-    about = "Connects this machine to the Blue hub"
+    about = "Connects this machine to the Blue server"
 )]
 struct Cli {
     #[command(subcommand)]

@@ -1,6 +1,6 @@
 [package]
 name = "blue-daemon"
-description = "Local Blue client: connects a machine to the hub and drives Claude through the bridge."
+description = "Local Blue client: connects a machine to the server and drives Claude through the bridge."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

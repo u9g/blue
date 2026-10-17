@@ -26,7 +26,7 @@ if _version_not_supported:
 
 
 class ClientServiceStub:
-    """Hub API for clients: the voice agent, the CLI, and later the web UI.
+    """Server API for clients: the voice agent, the CLI, and later the web UI.
     Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
     """
 
@@ -74,7 +74,7 @@ class ClientServiceStub:
 
 
 class ClientServiceServicer:
-    """Hub API for clients: the voice agent, the CLI, and later the web UI.
+    """Server API for clients: the voice agent, the CLI, and later the web UI.
     Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
     """
 
@@ -170,7 +170,7 @@ def add_ClientServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class ClientService:
-    """Hub API for clients: the voice agent, the CLI, and later the web UI.
+    """Server API for clients: the voice agent, the CLI, and later the web UI.
     Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
     """
 

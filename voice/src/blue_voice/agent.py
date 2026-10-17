@@ -1,7 +1,7 @@
 """Blue's LiveKit voice agent.
 
 The voice pipeline follows LiveKit's agent-starter-python defaults (LiveKit Inference STT/LLM/TTS,
-LiveKit turn detector, ai-coustics noise cancellation). Hub tools arrive in phase 3.
+LiveKit turn detector, ai-coustics noise cancellation). Server tools arrive in phase 3.
 
 Run locally:  uv run python -m blue_voice.agent dev
 """

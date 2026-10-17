@@ -1,7 +1,7 @@
 [project]
 name = "blue-voice"
 version = "0.1.0"
-description = "Blue's LiveKit voice agent: the conversational front end to the Blue hub."
+description = "Blue's LiveKit voice agent: the conversational front end to the Blue server."
 requires-python = ">=3.12, <3.15"
 dependencies = [
     "grpcio~=1.84",

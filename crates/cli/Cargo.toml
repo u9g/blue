@@ -1,6 +1,6 @@
 [package]
 name = "blue-cli"
-description = "Text client for the Blue hub."
+description = "Text client for the Blue server."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

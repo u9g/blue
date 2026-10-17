@@ -2,12 +2,12 @@
 
 Voice-driven control of Claude Code running on my own machines.
 
-I talk to a LiveKit voice agent. The agent talks to a central management server (the **hub**).
-The hub routes work to a **daemon** on whichever machine should do it. The daemon drives the
+I talk to a LiveKit voice agent. The agent talks to a central management **server**.
+The server routes work to a **daemon** on whichever machine should do it. The daemon drives the
 Claude Agent SDK through a thin TypeScript **bridge**, which runs the local `claude` binary.
 
 This replicates the loop T3 Code uses (host process → `@anthropic-ai/claude-agent-sdk`
-`query()` → `claude` binary over stream-json), but with the host split into a cloud hub and
+`query()` → `claude` binary over stream-json), but with the host split into a cloud server and
 per-machine daemons that we own, and with voice as the frontend.
 
 ---
@@ -20,9 +20,9 @@ per-machine daemons that we own, and with voice as the frontend.
   do it on that machine.
 - Hear back when work finishes, with a short spoken summary; ask "what's it doing?" any time.
 - Follow up, interrupt, and switch between sessions and machines by voice.
-- Multiple machines, each connecting outbound to the hub (no inbound ports, works behind NAT).
-- Sessions survive hub restarts, daemon restarts, and network drops.
-- Hub is a Helm chart deployable to a self-run Kubernetes cluster, backed by external Postgres.
+- Multiple machines, each connecting outbound to the server (no inbound ports, works behind NAT).
+- Sessions survive server restarts, daemon restarts, and network drops.
+- Server is a Helm chart deployable to a self-run Kubernetes cluster, backed by external Postgres.
 
 **Non-goals (for now)**
 
@@ -30,7 +30,7 @@ per-machine daemons that we own, and with voice as the frontend.
 - Permission prompts. Claude runs with `bypassPermissions`; the protocol reserves room to add
   approval later.
 - A custom web UI. LiveKit's Agents Playground is the frontend until phase 7.
-- Horizontal scaling of the hub. One replica; see §11 for the path to more.
+- Horizontal scaling of the server. One replica; see §11 for the path to more.
 
 ---
 
@@ -39,7 +39,7 @@ per-machine daemons that we own, and with voice as the frontend.
 | Component | Language | Why |
 |---|---|---|
 | `voice` — LiveKit agent | **Python** | `livekit-agents` (Python), hosted on LiveKit Cloud |
-| `hub` — management server | **Rust** | ours; deployed to k8s via Helm |
+| `server` — management server | **Rust** | ours; deployed to k8s via Helm |
 | `daemon` — local client | **Rust** | ours; all content flows through it |
 | `claude-bridge` — SDK adapter | **TypeScript** | the minimum needed to use `@anthropic-ai/claude-agent-sdk` |
 | `cli` — text client | **Rust** | drive the system without voice; admin tasks |
@@ -53,9 +53,9 @@ stdio adapter around `query()`.
 | Link | Transport | Encoding |
 |---|---|---|
 | bridge ⇄ daemon | child-process stdin/stdout | length-delimited protobuf frames (varint length + message) |
-| daemon ⇄ hub | gRPC over HTTP/2 + TLS (`DaemonService.Attach`, bidi stream) | protobuf |
-| voice ⇄ hub | gRPC (`ClientService`, `AuthService`) | protobuf |
-| cli ⇄ hub | gRPC (same services) | protobuf |
+| daemon ⇄ server | gRPC over HTTP/2 + TLS (`DaemonService.Attach`, bidi stream) | protobuf |
+| voice ⇄ server | gRPC (`ClientService`, `AuthService`) | protobuf |
+| cli ⇄ server | gRPC (same services) | protobuf |
 
 The only JSON in the system is content we don't own: the Agent SDK's `SDKMessage` objects,
 which ride inside protobuf as an opaque `json` string field (§5.2).
@@ -77,19 +77,19 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
   └──────────────────┬──────────────────────┘    │
                      │ gRPC ClientService (protobuf, service token)
                      ▼                           │
-  ┌──────────── self-run k8s (Helm: blue-hub) ───┴─────────┐
-  │  hub (Rust, tonic gRPC)                                 │
+  ┌──────────── self-run k8s (Helm: blue-server) ┴──────────┐
+  │  server (Rust, tonic gRPC)                              │
   │  auth · machine registry · sessions/turns · routing ·   │
   │  event log + fan-out · LiveKit token minting            │
   │            │ sqlx                                       │
   └────────────┼────────────────────────────────────────────┘
                ▼
-         external Postgres (database `blue`, role `blue_hub`)
+         external Postgres (database `blue`, role `blue_server`)
                ▲
                │ gRPC DaemonService.Attach bidi stream (outbound, machine token)
   ┌────────────┴───────────── each machine ─────────────────┐
   │ blue-daemon (Rust)                                       │
-  │  hub connection · session supervisor · SDK→event         │
+  │  server connection · session supervisor · SDK→event      │
   │  translation · SQLite outbox · project allowlist         │
   │       │ stdin/stdout length-delimited protobuf           │
   │       │ (one child per session)                          │
@@ -105,11 +105,11 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
 
 1. I say "in the blue repo on my desktop, add a health endpoint."
 2. Voice LLM calls `start_task(machine="desktop", project="blue", instructions=…)`.
-3. Voice sends `session.create` to the hub; hub persists session + turn, routes
+3. Voice sends `session.create` to the server; server persists session + turn, routes
    `session.start` to the desktop daemon; voice immediately says "On it."
 4. Daemon spawns a bridge, sends `start` + `prompt`. Bridge calls `query()`.
 5. SDK messages stream bridge → daemon (raw). Daemon translates to events, writes them to its
-   outbox, sends them to the hub; hub stores them and fans out to subscribers.
+   outbox, sends them to the server; server stores them and fans out to subscribers.
 6. Voice stays quiet during progress. If I ask "what's it doing?", it calls `get_status`, which
    returns recent progress events, and summarizes.
 7. On `turn.completed`, voice waits for a quiet moment and speaks a 1–2 sentence summary.
@@ -134,18 +134,18 @@ blue/
 │   └── blue/
 │       ├── events/v1/events.proto   # SessionEvent (translated from SDK messages)
 │       ├── bridge/v1/bridge.proto   # daemon ⇄ bridge stdio frames
-│       ├── daemon/v1/daemon.proto   # DaemonService (hub ⇄ daemon)
-│       ├── client/v1/client.proto   # ClientService (hub ⇄ voice/cli)
+│       ├── daemon/v1/daemon.proto   # DaemonService (server ⇄ daemon)
+│       ├── client/v1/client.proto   # ClientService (server ⇄ voice/cli)
 │       └── auth/v1/auth.proto       # AuthService (login, LiveKit tokens, pairing)
 ├── crates/
 │   ├── protocol/              # generated Rust (tonic/prost, build.rs) + framing helpers
 │   │   └── src/{lib.rs, framing.rs}
-│   ├── hub/                   # bin: blue-hub
+│   ├── server/                # bin: blue-server
 │   │   ├── src/{main.rs, config.rs, grpc/, auth/, db/, routing/, livekit.rs}
 │   │   ├── migrations/        # sqlx migrations (embedded)
 │   │   └── Dockerfile
 │   ├── daemon/                # bin: blue-daemon
-│   │   └── src/{main.rs, config.rs, hub_conn.rs, supervisor.rs, bridge_proc.rs,
+│   │   └── src/{main.rs, config.rs, server_conn.rs, supervisor.rs, bridge_proc.rs,
 │   │            translate.rs, outbox.rs, service.rs, doctor.rs}
 │   └── cli/                   # bin: blue
 ├── bridge/                    # TypeScript: claude-bridge
@@ -156,13 +156,13 @@ blue/
 ├── voice/                     # Python: LiveKit agent
 │   ├── pyproject.toml, uv.lock
 │   ├── Dockerfile
-│   ├── src/blue_voice/{agent.py, tools.py, hub_client.py, notifier.py, prompts.py}
+│   ├── src/blue_voice/{agent.py, tools.py, server_client.py, notifier.py, prompts.py}
 │   ├── src/blue/              # generated by grpcio-tools (committed; needed for LiveKit Cloud builds)
 │   └── tests/
 ├── deploy/
-│   ├── helm/blue-hub/         # the Helm chart (§9)
+│   ├── helm/blue-server/      # the Helm chart (§9)
 │   ├── db/bootstrap.sql       # manual alternative to the bootstrap hook
-│   └── compose/compose.yaml   # local Postgres (+ optional hub container)
+│   └── compose/compose.yaml   # local Postgres (+ optional server container)
 └── .github/workflows/         # §12
 ```
 
@@ -175,10 +175,10 @@ the directory (`blue.daemon.v1`, …); `buf lint` (STANDARD rules) runs in CI.
 
 | Package | File | Used by |
 |---|---|---|
-| `blue.events.v1` | `events.proto` | `SessionEvent` + `SessionState` shared by daemon, hub, clients |
+| `blue.events.v1` | `events.proto` | `SessionEvent` + `SessionState` shared by daemon, server, clients |
 | `blue.bridge.v1` | `bridge.proto` | daemon ⇄ bridge stdio |
-| `blue.daemon.v1` | `daemon.proto` | `DaemonService` (hub ⇄ daemon) |
-| `blue.client.v1` | `client.proto` | `ClientService` (hub ⇄ voice, cli, later web) |
+| `blue.daemon.v1` | `daemon.proto` | `DaemonService` (server ⇄ daemon) |
+| `blue.client.v1` | `client.proto` | `ClientService` (server ⇄ voice, cli, later web) |
 | `blue.auth.v1` | `auth.proto` | `AuthService` (login, LiveKit tokens, pairing, revocation) |
 
 Generated code:
@@ -223,7 +223,7 @@ input iterable so the query finishes cleanly.
 Daemon-side process control: the bridge (and the `claude` it spawns) run in a Windows Job
 Object / Unix process group so a hard kill takes down the whole tree.
 
-### 5.2 Daemon ⇄ Hub (`blue.daemon.v1.DaemonService`)
+### 5.2 Daemon ⇄ Server (`blue.daemon.v1.DaemonService`)
 
 ```proto
 service DaemonService {
@@ -235,15 +235,15 @@ One long-lived bidirectional gRPC stream per daemon, opened outbound from the ma
 Auth: `authorization: Bearer <machine token>` metadata. HTTP/2 keepalive pings every 20 s;
 the daemon reconnects with jittered backoff when the stream ends.
 
-Daemon → hub (`AttachRequest.oneof message`):
+Daemon → server (`AttachRequest.oneof message`):
 
 | Message | Fields | Notes |
 |---|---|---|
 | `Hello` | `protocol_version, versions{daemon, bridge, sdk, claude}, os, arch, projects[{name, path}], sessions[{session_id, claude_session_id, state, last_seq}]` | must be first |
 | `DaemonEvent` | `session_id, seq, turn_id, occurred_at, blue.events.v1.SessionEvent event` | `seq` per-session, monotonic, outbox-backed |
-| `CommandResult` | `command_id, ok, error_code, error_message` | reply to a hub `Command` |
+| `CommandResult` | `command_id, ok, error_code, error_message` | reply to a server `Command` |
 
-Hub → daemon (`AttachResponse.oneof message`):
+Server → daemon (`AttachResponse.oneof message`):
 
 | Message | Fields |
 |---|---|
@@ -257,14 +257,14 @@ Hub → daemon (`AttachResponse.oneof message`):
 
 Delivery guarantees:
 
-- Daemon → hub events are **at-least-once**; hub dedupes on `(session_id, seq)`.
-- Hub → daemon commands are idempotent by `command_id`; daemon keeps recently processed ids
+- Daemon → server events are **at-least-once**; server dedupes on `(session_id, seq)`.
+- Server → daemon commands are idempotent by `command_id`; daemon keeps recently processed ids
   (persisted in its SQLite).
-- On reconnect, `Hello.sessions` + `Welcome.acked_seqs` reconcile state: hub marks sessions it
+- On reconnect, `Hello.sessions` + `Welcome.acked_seqs` reconcile state: server marks sessions it
   believed running but the daemon doesn't know as failed ("daemon lost session"); daemon replays
   unacked outbox entries.
 
-### 5.3 Client ⇄ Hub (`blue.client.v1.ClientService`)
+### 5.3 Client ⇄ Server (`blue.client.v1.ClientService`)
 
 Used by voice, the CLI, and later the web UI (via gRPC-Web from `tonic-web`).
 Auth: `authorization: Bearer <token>` — the voice service token or a user JWT.
@@ -282,7 +282,7 @@ Auth: `authorization: Bearer <token>` — the voice service token or a user JWT.
 `Event { cursor, occurred_at, oneof kind { SessionEventEnvelope session, MachineStatus machine_status } }`.
 `cursor` is the global `events.id`; a reconnecting subscriber passes its last cursor to resume.
 
-`machine` and `project` accept ids or names; the hub resolves names case-insensitively. Errors
+`machine` and `project` accept ids or names; the server resolves names case-insensitively. Errors
 use gRPC status codes: `NOT_FOUND`, and `FAILED_PRECONDITION` for ambiguity, with an
 `AmbiguousTarget { candidates[] }` message in the status details so the voice agent can ask.
 
@@ -314,7 +314,7 @@ tested against recorded fixtures). `SessionEvent` is a `oneof`:
 | `SessionStateChanged` | daemon | `SessionState` enum: `STARTING, IDLE, RUNNING, CLOSED, FAILED` |
 | `RawSdkMessage` | every SDK message (if `forward_raw`) | `json` |
 
-`MachineStatus { machine_id, online }` is produced by the hub, not the daemon, and lives in
+`MachineStatus { machine_id, online }` is produced by the server, not the daemon, and lives in
 `blue.client.v1.Event`. Partial stream events (`stream_event`) are only forwarded as
 `RawSdkMessage`. Unknown SDK message types are logged and forwarded raw, never fatal.
 
@@ -322,17 +322,17 @@ tested against recorded fixtures). `SessionEvent` is a `oneof`:
 
 ## 6. Components in detail
 
-### 6.1 Hub (`crates/hub`, bin `blue-hub`)
+### 6.1 Server (`crates/server`, bin `blue-server`)
 
 **Stack:** tokio, tonic (gRPC; `tonic-health` for probes, `tonic-web` later for the browser), sqlx (Postgres, compile-time-checked queries, embedded
 migrations), `livekit-api` (token minting), `jsonwebtoken`, `argon2`, `tracing`, `clap`.
 
 **Subcommands** (one image, three roles):
 
-- `blue-hub serve` — the server.
-- `blue-hub db bootstrap` — uses the admin DSN to create role + database (§7).
-- `blue-hub db migrate` — runs embedded migrations as the app role.
-- `blue-hub admin set-password` — create/update the single user (also seedable from env).
+- `blue-server serve` — the server.
+- `blue-server db bootstrap` — uses the admin DSN to create role + database (§7).
+- `blue-server db migrate` — runs embedded migrations as the app role.
+- `blue-server admin set-password` — create/update the single user (also seedable from env).
 
 **gRPC services** (one port, h2c behind the ingress; TLS terminates at the ingress):
 
@@ -384,12 +384,12 @@ task; translated events are kept.
 
 **Subcommands:**
 
-- `blue-daemon pair --hub https://hub.example.com --code ABCD-1234 [--name desktop]`
+- `blue-daemon pair --server https://server.example.com --code ABCD-1234 [--name desktop]`
 - `blue-daemon start` — foreground.
 - `blue-daemon service install|uninstall|status` — via the `service-manager` crate
   (Windows service / launchd / systemd user unit).
 - `blue-daemon doctor` — checks: config valid, `claude` found + version, bridge starts and
-  reports a matching protocol version, hub reachable and token accepted, each project path
+  reports a matching protocol version, server reachable and token accepted, each project path
   exists.
 - `blue-daemon projects add <name> <path>` / `list` / `remove`.
 
@@ -397,7 +397,7 @@ task; translated events are kept.
 `~/.config/blue/` elsewhere):
 
 ```toml
-hub_url = "https://hub.example.com"
+server_url = "https://server.example.com"
 machine_name = "desktop"
 claude_path = "C:/Users/Jason/.local/bin/claude.exe"   # auto-detected if omitted
 bridge_path = ""                                        # default: next to blue-daemon
@@ -414,7 +414,7 @@ restricted permissions.
 
 **Internals:**
 
-- `hub_conn` — tonic client, open `Attach`, send `Hello`, reconnect with jittered exponential backoff, dispatch
+- `server_conn` — tonic client, open `Attach`, send `Hello`, reconnect with jittered exponential backoff, dispatch
   commands, drain outbox.
 - `supervisor` — `sessionId → SessionActor`. Each actor owns a bridge child process, its
   stdin writer, a stdout reader task, current turn, and the `claudeSessionId`.
@@ -449,12 +449,12 @@ restricted permissions.
 - `livekit-agents` with LiveKit's recommended defaults at implementation time (the voice AI
   quickstart: STT/LLM/TTS via LiveKit Inference, Silero VAD, LiveKit turn detector, noise
   cancellation). No extra provider keys.
-- Registered with explicit dispatch, `agent_name="blue-voice"`; the hub's token endpoint puts
+- Registered with explicit dispatch, `agent_name="blue-voice"`; the server's token endpoint puts
   the dispatch into the room token.
 - Deployed with `lk agent create` / `lk agent deploy` from `voice/`. Secrets in LiveKit
-  Cloud: `BLUE_HUB_URL`, `BLUE_VOICE_TOKEN`.
+  Cloud: `BLUE_SERVER_URL`, `BLUE_VOICE_TOKEN`.
 
-**Per-job state:** one `HubClient` (`grpc.aio` channel to `ClientService`; `Subscribe` stream
+**Per-job state:** one `ServerClient` (`grpc.aio` channel to `ClientService`; `Subscribe` stream
 auto-reconnects and resumes from its last cursor), a "focused session" id, and a notification queue.
 
 **Tools** (`@function_tool`):
@@ -475,11 +475,11 @@ auto-reconnects and resumes from its last cursor), a "focused session" id, and a
   write code yourself; you dispatch.
 - Pass the user's request to Claude close to verbatim — clean up disfluencies, resolve "it"/
   "that" from context, don't reinterpret.
-- Confirm machine/project only when ambiguous (hub returns candidates).
+- Confirm machine/project only when ambiguous (server returns candidates).
 - Acknowledge dispatch in a few words. Never read code, diffs, or paths character by character.
 - Stay silent during progress unless asked.
 
-**Notifications (`notifier.py`):** subscribes to hub events. On `TurnCompleted` /
+**Notifications (`notifier.py`):** subscribes to server events. On `TurnCompleted` /
 `TurnFailed` / `MachineStatus{online=false}` with a running session, enqueue a notification.
 When neither the user nor the agent is speaking, deliver it via
 `session.generate_reply(instructions=…)` with the (truncated) `resultText` and the instruction
@@ -502,16 +502,16 @@ Text client over the same gRPC services (`ClientService` + `AuthService`):
 Assumption: a reachable Postgres server and an **admin DSN** whose role has `CREATEROLE` and
 `CREATEDB`. Everything else the project creates itself.
 
-`blue-hub db bootstrap` (idempotent, safe to rerun):
+`blue-server db bootstrap` (idempotent, safe to rerun):
 
 1. Connect with admin DSN (`sslmode=require` default).
-2. `CREATE ROLE blue_hub LOGIN PASSWORD …` if missing; otherwise `ALTER ROLE … PASSWORD …`
+2. `CREATE ROLE blue_server LOGIN PASSWORD …` if missing; otherwise `ALTER ROLE … PASSWORD …`
    so the role password always matches the app Secret.
-3. `CREATE DATABASE blue OWNER blue_hub` if missing.
+3. `CREATE DATABASE blue OWNER blue_server` if missing.
 4. Connect to `blue`: `REVOKE ALL ON SCHEMA public FROM PUBLIC`,
-   `ALTER SCHEMA public OWNER TO blue_hub`.
+   `ALTER SCHEMA public OWNER TO blue_server`.
 
-`blue-hub db migrate` then runs as `blue_hub` — the admin role never touches app tables.
+`blue-server db migrate` then runs as `blue_server` — the admin role never touches app tables.
 
 Fallback for providers where databases are created only through their own console/API:
 `deploy/db/bootstrap.sql` (same steps, run by hand) and `database.bootstrap.enabled=false`.
@@ -520,26 +520,26 @@ Fallback for providers where databases are created only through their own consol
 
 ## 8. Auth and security
 
-Permissions are wide open on the machines, so **hub auth is the security boundary**.
+Permissions are wide open on the machines, so **server auth is the security boundary**.
 
 | Principal | Credential | Storage |
 |---|---|---|
 | Me (user) | username + password → short-lived JWT | argon2 hash in DB / Secret |
-| Voice agent | static service token | k8s Secret (hub) + LiveKit Cloud secret (agent) |
+| Voice agent | static service token | k8s Secret (server) + LiveKit Cloud secret (agent) |
 | Each daemon | per-machine token from pairing | hash in DB; plaintext in OS keyring on machine |
-| LiveKit room | room token minted by hub after login | — |
+| LiveKit room | room token minted by server after login | — |
 
 - Pairing codes: single-use, 10-minute TTL, hashed at rest.
 - Machine tokens revocable; revocation closes the live connection.
 - Rate limiting on `AuthService.Login` and `AuthService.ClaimPairingCode`.
-- TLS everywhere via cert-manager on ingress; daemons refuse plaintext hubs except
+- TLS everywhere via cert-manager on ingress; daemons refuse plaintext servers except
   `localhost`.
 - Daemon-side project allowlist: Claude only ever starts in configured project directories.
 - Audit log of logins, pairings, revocations, session creates.
 
 ---
 
-## 9. Kubernetes deployment (Helm chart `deploy/helm/blue-hub`)
+## 9. Kubernetes deployment (Helm chart `deploy/helm/blue-server`)
 
 Target: self-run cluster (k3s assumed). Generic enough for others.
 
@@ -556,9 +556,9 @@ Target: self-run cluster (k3s assumed). Generic enough for others.
   keep values stable across upgrades; created as a pre-install hook (weight −20) with
   `helm.sh/resource-policy: keep`. Skipped when `existingSecret` is set.
 - `job-db-bootstrap.yaml` — `pre-install,pre-upgrade` hook, weight −10, runs
-  `blue-hub db bootstrap`, the only pod that mounts the admin DSN Secret.
-- `job-db-migrate.yaml` — `pre-install,pre-upgrade` hook, weight 0, `blue-hub db migrate`.
-- `serviceaccount.yaml`, `NOTES.txt` (prints the hub URL, how to get the voice token, how to
+  `blue-server db bootstrap`, the only pod that mounts the admin DSN Secret.
+- `job-db-migrate.yaml` — `pre-install,pre-upgrade` hook, weight 0, `blue-server db migrate`.
+- `serviceaccount.yaml`, `NOTES.txt` (prints the server URL, how to get the voice token, how to
   pair a daemon), `tests/test-connection.yaml` (`helm test` runs a gRPC health check).
 - `values.schema.json` — validates values.
 
@@ -566,22 +566,22 @@ Target: self-run cluster (k3s assumed). Generic enough for others.
 
 ```yaml
 image:
-  repository: ghcr.io/<owner>/blue-hub
+  repository: ghcr.io/<owner>/blue-server
   tag: ""                      # defaults to Chart appVersion
 imagePullSecrets: []
 replicaCount: 1
-publicUrl: https://hub.example.com
+publicUrl: https://server.example.com
 ingress:
   enabled: true
   className: traefik
-  host: hub.example.com
+  host: server.example.com
   tls: { enabled: true, clusterIssuer: letsencrypt-prod }
 gatewayApi: { enabled: false }
 database:
   host: ""
   port: 5432
   name: blue
-  user: blue_hub
+  user: blue_server
   sslmode: require
   existingSecret: ""           # key: password
   bootstrap:
@@ -606,9 +606,9 @@ OCI artifact (`helm push`).
 ```sh
 kubectl create secret generic blue-db-admin --from-literal=dsn='postgres://admin:…@host/postgres?sslmode=require'
 kubectl create secret generic blue-livekit --from-literal=apiKey=… --from-literal=apiSecret=…
-helm install blue oci://ghcr.io/<owner>/charts/blue-hub \
+helm install blue oci://ghcr.io/<owner>/charts/blue-server \
   --set database.host=… --set database.bootstrap.adminExistingSecret=blue-db-admin \
-  --set livekit.existingSecret=blue-livekit --set ingress.host=hub.example.com
+  --set livekit.existingSecret=blue-livekit --set ingress.host=server.example.com
 ```
 
 ---
@@ -621,10 +621,10 @@ k3d (for chart testing), Helm.
 | Command | Does |
 |---|---|
 | `just db` | `docker compose up` Postgres 17 with an admin user |
-| `just hub` | `blue-hub db bootstrap && db migrate && serve` against local Postgres |
+| `just server` | `blue-server db bootstrap && db migrate && serve` against local Postgres |
 | `just bridge` | `bun build --compile` the bridge into `target/debug/` |
 | `just daemon` | `blue-daemon start` against `http://localhost:8080` |
-| `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local hub directly (no tunnel needed) |
+| `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local server directly (no tunnel needed) |
 | `just proto` | `buf lint` + regenerate TS and Python protocol code (Rust regenerates on build) |
 | `just test` | cargo tests, bridge typecheck + tests, voice tests |
 | `just chart-test` | k3d cluster + in-cluster Postgres + `helm install` + `helm test` |
@@ -641,19 +641,19 @@ Frontend during development: LiveKit Agents Playground, connecting with a token 
 - **Protocol:** `buf lint`; framing round-trip tests in Rust and TS; Python import/round-trip
   test; generated-code freshness check in CI; cross-language handshake (daemon ⇄ compiled bridge).
 - **Daemon:** integration tests using `claude-bridge --replay` — multi-turn, interrupt, bridge
-  crash + resume, outbox replay after a dropped hub connection.
-- **Hub:** integration tests against real Postgres (`testcontainers`), with an in-process fake
+  crash + resume, outbox replay after a dropped server connection.
+- **Server:** integration tests against real Postgres (`testcontainers`), with an in-process fake
   daemon and fake client over real gRPC streams: routing, dedupe, turn queueing, reconnect
   reconciliation, auth failures.
 - **Bootstrap/migrations:** test against a fresh Postgres with a non-superuser admin that has
   only `CREATEROLE CREATEDB`.
-- **Voice:** `livekit-agents` test harness with a mocked `HubClient`: tool selection for
+- **Voice:** `livekit-agents` test harness with a mocked `ServerClient`: tool selection for
   representative utterances, ambiguity handling, notification delivery.
 - **Chart:** `helm lint`, `ct lint`, k3d install in CI.
 - **End-to-end smoke (manual / opt-in CI with credentials):** real `claude` on a scratch repo,
   driven by `blue run`.
 
-Scaling note for later: multiple hub replicas need cross-pod routing (daemon connected to pod
+Scaling note for later: multiple server replicas need cross-pod routing (daemon connected to pod
 A, client on pod B). Postgres `LISTEN/NOTIFY` is the planned mechanism, so no Redis. Not in
 scope now.
 
@@ -666,8 +666,8 @@ scope now.
   `buf lint`, `just proto && git diff --exit-code`, `helm lint` + `ct lint`.
 - **chart-e2e.yml**: k3d + Postgres + install chart + `helm test`.
 - **release.yml** (tag `v*`):
-  - hub image → `ghcr.io/<owner>/blue-hub:<version>` (amd64 + arm64)
-  - chart → `oci://ghcr.io/<owner>/charts/blue-hub:<version>`
+  - server image → `ghcr.io/<owner>/blue-server:<version>` (amd64 + arm64)
+  - chart → `oci://ghcr.io/<owner>/charts/blue-server:<version>`
   - daemon archives per target (`blue-daemon` + `claude-bridge` + `blue` + README) → GitHub
     Release
 - Voice deploys are manual (`lk agent deploy`) at first; automate later if useful.
@@ -682,7 +682,7 @@ One version number for the whole repo.
 Cargo workspace, `proto/` with the v1 definitions, codegen for Rust/TS/Python, `bridge/`
 (bun) answering the protobuf handshake, `voice/` (uv) skeleton, `justfile`, CI, GitHub repo.
 *Exit:* `just test` and CI pass; `blue-daemon doctor` spawns the bun-compiled bridge and gets a
-`Ready` frame over protobuf; `blue health` gets SERVING from `blue-hub serve`.
+`Ready` frame over protobuf; `blue health` gets SERVING from `blue-server serve`.
 
 **Phase 1 — Daemon ⇄ bridge on Windows (riskiest first)**
 Bridge implemented; Rust spawns it, runs a multi-turn session in a scratch repo, interrupts,
@@ -691,25 +691,25 @@ SDK and an explicit `pathToClaudeCodeExecutable`. Record fixtures. Implement `tr
 *Exit:* a Rust test binary drives three turns + interrupt + resume against real `claude`;
 translation snapshot tests pass on fixtures; process-tree kill verified on Windows.
 
-**Phase 2 — Hub, protocol, daemon, CLI (local)**
-Protocols in `crates/protocol`; hub with Postgres, bootstrap, migrations, auth, pairing,
-routing, event log, fan-out, turn queue; daemon hub connection + outbox + reconciliation; CLI.
-*Exit:* `blue run desktop blue "…"` streams a full task through hub → daemon → Claude and back;
-killing the hub or the daemon mid-task loses no events.
+**Phase 2 — Server, protocol, daemon, CLI (local)**
+Protocols in `crates/protocol`; server with Postgres, bootstrap, migrations, auth, pairing,
+routing, event log, fan-out, turn queue; daemon server connection + outbox + reconciliation; CLI.
+*Exit:* `blue run desktop blue "…"` streams a full task through server → daemon → Claude and back;
+killing the server or the daemon mid-task loses no events.
 
 **Phase 3 — Voice agent (local worker)**
-Agent with tools, hub client, notifier, system prompt; LiveKit Cloud project; Agents
-Playground with a hub-minted token.
+Agent with tools, server client, notifier, system prompt; LiveKit Cloud project; Agents
+Playground with a server-minted token.
 *Exit:* by voice alone: start a task, ask status, follow up, interrupt, get a spoken completion
 summary.
 
 **Phase 4 — Helm chart**
-Hub Dockerfile, chart with hooks, k3d test, release workflow publishing image + chart.
+Server Dockerfile, chart with hooks, k3d test, release workflow publishing image + chart.
 *Exit:* `just chart-test` green locally and in CI against a fresh Postgres.
 
 **Phase 5 — Real deployment**
 Install chart in the self-run cluster against the hosted Postgres; DNS + TLS; `lk agent deploy`
-the voice agent with secrets; pair this machine against the public hub.
+the voice agent with secrets; pair this machine against the public server.
 *Exit:* full voice loop from my phone with nothing running locally except `blue-daemon`.
 
 **Phase 6 — Hardening**
@@ -733,7 +733,7 @@ Technology decided then.
 | `bun build --compile` incompatibility with the SDK | Verify in phase 1; fallback: ship bridge as bundled JS + require Node, or Node SEA |
 | Orphaned `claude` processes on Windows | Job Objects with kill-on-close; tested in phase 1 |
 | Long-lived gRPC streams dropped by ingress/LB | HTTP/2 keepalive every 20 s; reconnect + outbox replay; documented ingress timeouts |
-| Allow-all permissions + remote voice | Strong hub auth; per-machine tokens; project allowlist; audit log |
+| Allow-all permissions + remote voice | Strong server auth; per-machine tokens; project allowlist; audit log |
 | Voice talks over me / interrupts at bad times | Notifications only when both sides are quiet; coalescing; LiveKit turn detection |
 | Hosted Postgres disallows `CREATE DATABASE` | Manual `bootstrap.sql` path with bootstrap disabled |
 | `claude` not logged in on a machine | `blue-daemon doctor` checks; surfaced as `turn.failed` with a clear reason |
@@ -743,7 +743,7 @@ Technology decided then.
 ## 15. Open questions (none block phases 0–3)
 
 1. GitHub owner/name/visibility for the repo (needed for phase 0 CI and GHCR paths).
-2. Hub hostname and the cluster's cert-manager `ClusterIssuer` name.
+2. Server hostname and the cluster's cert-manager `ClusterIssuer` name.
 3. Cluster node architecture (amd64, arm64, or both).
 4. Hosted Postgres provider (to confirm `CREATEROLE`/`CREATEDB` are available).
 5. LiveKit Cloud project to use.

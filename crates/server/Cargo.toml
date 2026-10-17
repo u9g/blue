@@ -1,5 +1,5 @@
 [package]
-name = "blue-hub"
+name = "blue-server"
 description = "Blue management server: routes work between clients and daemons."
 version.workspace = true
 edition.workspace = true

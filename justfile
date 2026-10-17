@@ -66,11 +66,11 @@ lint-voice:
 handshake: bridge
     cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge{{exe}}
 
-# Run the hub locally
-hub:
-    cargo run -p blue-hub -- serve --listen 127.0.0.1:50051
+# Run the server locally
+server:
+    cargo run -p blue-server -- serve --listen 127.0.0.1:50051
 
-# gRPC health check against the hub
+# gRPC health check against the server
 health:
     cargo run -q -p blue-cli -- health
 

@@ -6,7 +6,7 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "blue-hub", version, about = "Blue management server")]
+#[command(name = "blue-server", version, about = "Blue management server")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -37,12 +37,12 @@ async fn serve(listen: SocketAddr) -> anyhow::Result<()> {
     // reported once the Blue services are registered.
     let (_health_reporter, health_service) = tonic_health::server::health_reporter();
 
-    info!(%listen, "blue-hub listening");
+    info!(%listen, "blue-server listening");
     Server::builder()
         .add_service(health_service)
         .serve_with_shutdown(listen, shutdown_signal())
         .await?;
-    info!("blue-hub stopped");
+    info!("blue-server stopped");
     Ok(())
 }
 

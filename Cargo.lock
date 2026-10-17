@@ -161,19 +161,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blue-hub"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "tokio",
- "tonic",
- "tonic-health",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "blue-protocol"
 version = "0.1.0"
 dependencies = [
@@ -185,6 +172,19 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
+]
+
+[[package]]
+name = "blue-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "tokio",
+ "tonic",
+ "tonic-health",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

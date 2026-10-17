@@ -5,7 +5,7 @@ package blue.client.v1;
 import "blue/events/v1/events.proto";
 import "google/protobuf/timestamp.proto";
 
-// Hub API for clients: the voice agent, the CLI, and later the web UI.
+// Server API for clients: the voice agent, the CLI, and later the web UI.
 // Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
 service ClientService {
   rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse);

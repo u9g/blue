@@ -5,14 +5,14 @@ package blue.daemon.v1;
 import "blue/events/v1/events.proto";
 import "google/protobuf/timestamp.proto";
 
-// Hub <-> daemon. Each daemon keeps one Attach stream open, dialed outbound from its machine.
+// Server <-> daemon. Each daemon keeps one Attach stream open, dialed outbound from its machine.
 // Auth: `authorization: Bearer <machine token>` metadata.
 service DaemonService {
   // Bidirectional session stream. The first request must be a Hello.
   rpc Attach(stream AttachRequest) returns (stream AttachResponse);
 }
 
-// Daemon -> hub.
+// Daemon -> server.
 message AttachRequest {
   oneof message {
     Hello hello = 1;
@@ -21,7 +21,7 @@ message AttachRequest {
   }
 }
 
-// Hub -> daemon.
+// Server -> daemon.
 message AttachResponse {
   oneof message {
     Welcome welcome = 1;
@@ -61,7 +61,7 @@ message SessionSnapshot {
   uint64 last_seq = 4;
 }
 
-// One translated event. Delivered at least once; the hub dedupes on (session_id, seq).
+// One translated event. Delivered at least once; the server dedupes on (session_id, seq).
 message DaemonEvent {
   string session_id = 1;
   // Per-session, monotonically increasing, starting at 1.
@@ -81,7 +81,7 @@ message CommandResult {
 
 message Welcome {
   string machine_id = 1;
-  // session_id -> highest seq the hub has stored. The daemon trims or replays its outbox.
+  // session_id -> highest seq the server has stored. The daemon trims or replays its outbox.
   map<string, uint64> acked_seqs = 2;
 }
 
@@ -117,7 +117,7 @@ message CloseSession {
   string session_id = 1;
 }
 
-// The hub has durably stored every event for session_id up to and including up_to_seq.
+// The server has durably stored every event for session_id up to and including up_to_seq.
 message EventsAck {
   string session_id = 1;
   uint64 up_to_seq = 2;
