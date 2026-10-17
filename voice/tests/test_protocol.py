@@ -6,11 +6,13 @@ from blue.events.v1 import events_pb2
 
 def test_create_session_round_trip() -> None:
     request = client_pb2.CreateSessionRequest(
-        machine="desktop", instructions="in the blue repo, add a health endpoint"
+        machine="desktop",
+        instructions="in the blue repo, add a health endpoint",
+        title="Health endpoint",
     )
     decoded = client_pb2.CreateSessionRequest.FromString(request.SerializeToString())
     assert decoded == request
-    assert not decoded.HasField("title")
+    assert decoded.title == "Health endpoint"
 
 
 def test_session_event_oneof() -> None:

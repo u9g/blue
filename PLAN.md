@@ -104,8 +104,8 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
 ### A voice turn, end to end
 
 1. I say "in the blue repo on my desktop, add a health endpoint."
-2. Voice LLM calls `start_task(machine="desktop", instructions="in the blue repo, add a health
-   endpoint")`.
+2. Voice LLM calls `start_task(machine="desktop", title="Health endpoint", instructions="in the
+   blue repo, add a health endpoint")`.
 3. Voice sends `session.create` to the server; server persists session + turn, routes
    `session.start` to the desktop daemon; voice immediately says "On it."
 4. Daemon spawns a bridge, sends `start` + `prompt`. Bridge calls `query()`.
@@ -279,7 +279,7 @@ Auth: `authorization: Bearer <token>` — the voice service token or a user sess
 |---|---|
 | `ListMachines` | — → machines with online status |
 | `ListSessions` | `machine?, active_only` → sessions |
-| `CreateSession` | `machine, instructions, title?` → `session, turn_id` |
+| `CreateSession` | `machine, instructions, title` → `session, turn_id` |
 | `SendPrompt` | `session_id, instructions` → `turn_id` (queued if a turn is running) |
 | `InterruptSession` | `session_id` → — |
 | `GetSession` | `session_id, recent_events` → session + recent events |
@@ -492,7 +492,7 @@ auto-reconnects and resumes from its last cursor), a "focused session" id, and a
 |---|---|
 | `list_machines()` | machines and online status |
 | `list_sessions(active_only=True)` | sessions with machine, title, state |
-| `start_task(machine, instructions)` | `CreateSession`; focuses the new session |
+| `start_task(machine, title, instructions)` | `CreateSession`; the LLM names the session (a few words); focuses it |
 | `send_follow_up(instructions, session=None)` | `SendPrompt` to focused or named session |
 | `get_status(session=None)` | `GetSession` with recent events; LLM summarizes |
 | `interrupt(session=None)` | `InterruptSession` |
@@ -522,7 +522,8 @@ Text client over the same gRPC services (`ClientService` + `AuthService`):
 - `blue login` (GitHub device flow; prints the code and opens github.com/login/device),
   `blue logout`, `blue whoami`; the session token is kept in the OS keyring
 - `blue pair-code`, `blue machines [revoke <name>]`
-- `blue run <machine> "<instructions>"` — create session, stream events to terminal
+- `blue run <machine> "<instructions>" [--title <title>]` (title defaults to the start of the
+  instructions) — create session, stream events to terminal
 - `blue send <session> "<instructions>"`, `blue interrupt <session>`, `blue sessions`,
   `blue tail [--session]`
 - `blue token` — print a LiveKit room token (handy with Agents Playground)
@@ -732,7 +733,7 @@ translation snapshot tests pass on fixtures; process-tree kill verified on Windo
 **Phase 2 — Server, protocol, daemon, CLI (local)**
 Protocols in `crates/protocol`; server with Postgres, bootstrap, migrations, auth, pairing,
 routing, event log, fan-out, turn queue; daemon server connection + outbox + reconciliation; CLI.
-*Exit:* `blue run desktop blue "…"` streams a full task through server → daemon → Claude and back;
+*Exit:* `blue run desktop "in the blue repo, …"` streams a full task through server → daemon → Claude and back;
 killing the server or the daemon mid-task loses no events.
 
 **Phase 3 — Voice agent (local worker)**

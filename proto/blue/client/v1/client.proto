@@ -108,7 +108,9 @@ message CreateSessionRequest {
   string machine = 1;
   // Which repo or directory to work in belongs here; Claude starts in the home directory.
   string instructions = 2;
-  optional string title = 3;
+  // Short name for the session, e.g. "Health endpoint". Required; an empty title is
+  // rejected with INVALID_ARGUMENT.
+  string title = 3;
 }
 
 message CreateSessionResponse {
