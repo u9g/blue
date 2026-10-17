@@ -1,0 +1,19 @@
+[package]
+name = "blue-hub"
+description = "Blue management server: routes work between clients and runners."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tonic-health.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

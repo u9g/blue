@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package blue.runner.v1;
+
+import "blue/events/v1/events.proto";
+import "google/protobuf/timestamp.proto";
+
+// Hub <-> runner. Each runner keeps one Attach stream open, dialed outbound from its machine.
+// Auth: `authorization: Bearer <machine token>` metadata.
+service RunnerService {
+  // Bidirectional session stream. The first request must be a Hello.
+  rpc Attach(stream AttachRequest) returns (stream AttachResponse);
+}
+
+// Runner -> hub.
+message AttachRequest {
+  oneof message {
+    Hello hello = 1;
+    RunnerEvent event = 2;
+    CommandResult command_result = 3;
+  }
+}
+
+// Hub -> runner.
+message AttachResponse {
+  oneof message {
+    Welcome welcome = 1;
+    Command command = 2;
+    EventsAck events_ack = 3;
+  }
+}
+
+message Hello {
+  uint32 protocol_version = 1;
+  Versions versions = 2;
+  string os = 3;
+  string arch = 4;
+  repeated Project projects = 5;
+  // Sessions this runner currently knows about, for reconciliation after a reconnect.
+  repeated SessionSnapshot sessions = 6;
+}
+
+message Versions {
+  string runner = 1;
+  string bridge = 2;
+  string sdk = 3;
+  string claude = 4;
+}
+
+// A directory the runner allows Claude to work in.
+message Project {
+  string name = 1;
+  string path = 2;
+}
+
+message SessionSnapshot {
+  string session_id = 1;
+  string claude_session_id = 2;
+  blue.events.v1.SessionState state = 3;
+  // Highest event seq the runner has produced for this session.
+  uint64 last_seq = 4;
+}
+
+// One translated event. Delivered at least once; the hub dedupes on (session_id, seq).
+message RunnerEvent {
+  string session_id = 1;
+  // Per-session, monotonically increasing, starting at 1.
+  uint64 seq = 2;
+  // Empty when the event is not tied to a turn.
+  string turn_id = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+  blue.events.v1.SessionEvent event = 5;
+}
+
+message CommandResult {
+  string command_id = 1;
+  bool ok = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message Welcome {
+  string machine_id = 1;
+  // session_id -> highest seq the hub has stored. The runner trims or replays its outbox.
+  map<string, uint64> acked_seqs = 2;
+}
+
+// Commands are idempotent by command_id.
+message Command {
+  string command_id = 1;
+  oneof command {
+    StartSession start_session = 2;
+    SendPrompt send_prompt = 3;
+    InterruptSession interrupt_session = 4;
+    CloseSession close_session = 5;
+  }
+}
+
+message StartSession {
+  string session_id = 1;
+  string project_name = 2;
+  optional string resume_claude_session_id = 3;
+  optional string model = 4;
+}
+
+message SendPrompt {
+  string session_id = 1;
+  string turn_id = 2;
+  string text = 3;
+}
+
+message InterruptSession {
+  string session_id = 1;
+}
+
+message CloseSession {
+  string session_id = 1;
+}
+
+// The hub has durably stored every event for session_id up to and including up_to_seq.
+message EventsAck {
+  string session_id = 1;
+  uint64 up_to_seq = 2;
+}

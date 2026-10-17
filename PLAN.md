@@ -47,6 +47,23 @@ per-machine runners that we own, and with voice as the frontend.
 The bridge has no business logic: no network, no persistence, no decisions. It is a
 stdio adapter around `query()`.
 
+**Wire format: Protocol Buffers everywhere we control both ends.** All `.proto` files live in
+`proto/` and are the single source of truth:
+
+| Link | Transport | Encoding |
+|---|---|---|
+| bridge ⇄ runner | child-process stdin/stdout | length-delimited protobuf frames (varint length + message) |
+| runner ⇄ hub | gRPC over HTTP/2 + TLS (`RunnerService.Attach`, bidi stream) | protobuf |
+| voice ⇄ hub | gRPC (`ClientService`, `AuthService`) | protobuf |
+| cli ⇄ hub | gRPC (same services) | protobuf |
+
+The only JSON in the system is content we don't own: the Agent SDK's `SDKMessage` objects,
+which ride inside protobuf as an opaque `json` string field (§5.2).
+
+Codegen: Rust via `tonic-prost-build` (with a vendored `protoc`, no install needed), TypeScript
+via `@bufbuild/protoc-gen-es` (driven by `buf generate`), Python via `grpcio-tools`. `buf lint`
+enforces style; `buf breaking` guards compatibility once v1 ships.
+
 ---
 
 ## 3. Architecture
@@ -58,10 +75,10 @@ stdio adapter around `query()`.
   ┌─────────────── LiveKit Cloud ───────────┐    │
   │ SFU  ◀──▶  voice (Python agent job)     │    │
   └──────────────────┬──────────────────────┘    │
-                     │ WSS  /v1/client (service token)
+                     │ gRPC ClientService (protobuf, service token)
                      ▼                           │
   ┌──────────── self-run k8s (Helm: blue-hub) ───┴─────────┐
-  │  hub (Rust, axum)                                       │
+  │  hub (Rust, tonic gRPC)                                 │
   │  auth · machine registry · sessions/turns · routing ·   │
   │  event log + fan-out · LiveKit token minting            │
   │            │ sqlx                                       │
@@ -69,12 +86,13 @@ stdio adapter around `query()`.
                ▼
          external Postgres (database `blue`, role `blue_hub`)
                ▲
-               │ WSS /v1/runner (outbound from each machine, machine token)
+               │ gRPC RunnerService.Attach bidi stream (outbound, machine token)
   ┌────────────┴───────────── each machine ─────────────────┐
   │ blue-runner (Rust)                                       │
   │  hub connection · session supervisor · SDK→event         │
   │  translation · SQLite outbox · project allowlist         │
-  │       │ stdin/stdout NDJSON (one child per session)      │
+  │       │ stdin/stdout length-delimited protobuf           │
+  │       │ (one child per session)                          │
   │       ▼                                                  │
   │ claude-bridge (TS, bun-compiled exe)                     │
   │       │ @anthropic-ai/claude-agent-sdk query()           │
@@ -110,31 +128,37 @@ blue/
 ├── justfile                   # cross-language task runner (dev, codegen, build, test)
 ├── Cargo.toml                 # Rust workspace
 ├── rust-toolchain.toml
+├── package.json               # bun workspace root (bridge) + buf tooling
+├── buf.yaml, buf.gen.yaml     # proto lint/breaking config + TS codegen
+├── proto/                     # ★ single source of truth for every wire protocol
+│   └── blue/
+│       ├── events/v1/events.proto   # SessionEvent (translated from SDK messages)
+│       ├── bridge/v1/bridge.proto   # runner ⇄ bridge stdio frames
+│       ├── runner/v1/runner.proto   # RunnerService (hub ⇄ runner)
+│       ├── client/v1/client.proto   # ClientService (hub ⇄ voice/cli)
+│       └── auth/v1/auth.proto       # AuthService (login, LiveKit tokens, pairing)
 ├── crates/
-│   ├── protocol/              # serde + schemars types for ALL wire protocols
-│   │   └── src/{envelope.rs, runner.rs, client.rs, bridge.rs, events.rs, ids.rs}
+│   ├── protocol/              # generated Rust (tonic/prost, build.rs) + framing helpers
+│   │   └── src/{lib.rs, framing.rs}
 │   ├── hub/                   # bin: blue-hub
-│   │   ├── src/{main.rs, config.rs, api/, ws/, auth/, db/, routing/, livekit.rs}
+│   │   ├── src/{main.rs, config.rs, grpc/, auth/, db/, routing/, livekit.rs}
 │   │   ├── migrations/        # sqlx migrations (embedded)
 │   │   └── Dockerfile
 │   ├── runner/                # bin: blue-runner
 │   │   └── src/{main.rs, config.rs, hub_conn.rs, supervisor.rs, bridge_proc.rs,
 │   │            translate.rs, outbox.rs, service.rs, doctor.rs}
-│   ├── cli/                   # bin: blue
-│   └── schema-gen/            # bin: emits JSON Schema from crates/protocol into schema/
+│   └── cli/                   # bin: blue
 ├── bridge/                    # TypeScript: claude-bridge
-│   ├── package.json, bun.lock, tsconfig.json
+│   ├── package.json, tsconfig.json
 │   ├── src/{main.ts, session.ts, io.ts}
-│   ├── src/protocol.gen.ts    # generated from schema/
-│   └── fixtures/              # recorded raw SDK message streams (NDJSON)
+│   ├── src/gen/               # generated by protoc-gen-es (committed)
+│   └── fixtures/              # recorded raw SDK message streams
 ├── voice/                     # Python: LiveKit agent
 │   ├── pyproject.toml, uv.lock
-│   ├── Dockerfile, livekit.toml
-│   ├── src/blue_voice/{__main__.py, agent.py, tools.py, hub_client.py,
-│   │                   notifier.py, prompts.py}
-│   ├── src/blue_voice/protocol/   # generated Pydantic models from schema/
+│   ├── Dockerfile
+│   ├── src/blue_voice/{agent.py, tools.py, hub_client.py, notifier.py, prompts.py}
+│   ├── src/blue/              # generated by grpcio-tools (committed; needed for LiveKit Cloud builds)
 │   └── tests/
-├── schema/                    # generated JSON Schema (committed; CI checks freshness)
 ├── deploy/
 │   ├── helm/blue-hub/         # the Helm chart (§9)
 │   ├── db/bootstrap.sql       # manual alternative to the bootstrap hook
@@ -146,139 +170,153 @@ blue/
 
 ## 5. Protocols
 
-All protocols are defined once, in Rust (`crates/protocol`), and exported as JSON Schema via
-`schemars` into `schema/`. Codegen produces:
+Every protocol is a set of `.proto` files under `proto/blue/<area>/v1/`. Package names follow
+the directory (`blue.runner.v1`, …); `buf lint` (STANDARD rules) runs in CI.
 
-- `bridge/src/protocol.gen.ts` via `json-schema-to-typescript`
-- `voice/src/blue_voice/protocol/` via `datamodel-code-generator` (Pydantic v2)
+| Package | File | Used by |
+|---|---|---|
+| `blue.events.v1` | `events.proto` | `SessionEvent` + `SessionState` shared by runner, hub, clients |
+| `blue.bridge.v1` | `bridge.proto` | runner ⇄ bridge stdio |
+| `blue.runner.v1` | `runner.proto` | `RunnerService` (hub ⇄ runner) |
+| `blue.client.v1` | `client.proto` | `ClientService` (hub ⇄ voice, cli, later web) |
+| `blue.auth.v1` | `auth.proto` | `AuthService` (login, LiveKit tokens, pairing, revocation) |
 
-`just codegen` regenerates everything; CI fails if the committed output is stale.
+Generated code:
 
-### 5.1 Common envelope (WebSocket protocols)
+| Language | Tool | Output | Committed? |
+|---|---|---|---|
+| Rust | `tonic-prost-build` in `crates/protocol/build.rs`, `protoc-bin-vendored` | `OUT_DIR` | no (built every time) |
+| TypeScript | `buf generate` + `protoc-gen-es` (only `blue/bridge`) | `bridge/src/gen/` | yes |
+| Python | `grpcio-tools` (`events`, `client`, `auth`) | `voice/src/blue/` | yes |
 
-JSON text frames:
+`just proto` regenerates TS + Python; CI fails if the committed output is stale.
 
-```json
-{ "v": 1, "id": "01J…", "type": "session.start", "payload": { … } }
-```
+**Versioning.** The `v1` in the package is the wire major version. Within v1, changes are
+additive only (`buf breaking` against `main` once phase 2 lands). Handshakes also carry a
+`protocol_version` integer so mismatched binaries fail fast with a readable error.
 
-- `v` — protocol major version. Mismatch on `hello` → connection refused with a clear error.
-- `id` — ULID; used for request/response correlation and idempotency.
-- Responses: `{ "type": "ack", "re": "<id>", "ok": true, "payload": … }` or
-  `{ "type": "ack", "re": "<id>", "ok": false, "error": { "code", "message" } }`.
-- Keepalive: WebSocket ping every 20 s both directions; 60 s without traffic → reconnect.
+### 5.1 Runner ⇄ Bridge (stdio, `blue.bridge.v1`)
 
-### 5.2 Runner ⇄ Bridge (stdio NDJSON)
+One bridge process per session. **stdout carries only protocol frames**; stderr is logs
+(runner forwards them into `tracing`).
 
-One bridge process per session. stdout = protocol only; stderr = logs (runner forwards into
-`tracing`).
+Framing: each frame is a protobuf varint length followed by that many bytes of message —
+the standard "size-delimited" format (`prost::Message::encode_length_delimited` in Rust,
+`sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`).
 
-Rust → TS:
-
-| type | payload |
-|---|---|
-| `start` | `sessionId, cwd, resume?, model?, claudePath, options{includePartialMessages, …}` |
-| `prompt` | `text` |
-| `interrupt` | — |
-| `close` | — (end input stream, finish, exit 0) |
-
-TS → Rust:
-
-| type | payload |
-|---|---|
-| `ready` | `protocolVersion, sdkVersion, nodeOrBunVersion` |
-| `sdk_message` | `raw` — the `SDKMessage` exactly as the SDK yielded it |
-| `error` | `message, fatal` |
-| `exited` | `code` |
+- Runner → bridge: `BridgeInput { oneof command { Start, Prompt, Interrupt, Close } }`
+  - `Start { session_id, cwd, claude_path, resume_claude_session_id?, model?, include_partial_messages }`
+  - `Prompt { turn_id, text }`
+  - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
+- Bridge → runner: `BridgeOutput { oneof event { Ready, SdkMessage, Error, Exited } }`
+  - `Ready { protocol_version, bridge_version, sdk_version, runtime_version }` — sent first
+  - `SdkMessage { json }` — the `SDKMessage` exactly as the SDK yielded it, `JSON.stringify`'d.
+    This is the one deliberate opaque field: the SDK's message shapes are Anthropic's and change
+    with SDK releases, so the bridge doesn't reinterpret them; the runner parses what it needs.
+  - `Error { message, fatal }`, `Exited { code }`
 
 Bridge behavior: `query({ prompt: asyncIterableOfUserMessages, options: { cwd, resume,
 permissionMode: "bypassPermissions", pathToClaudeCodeExecutable: claudePath, model,
-includePartialMessages } })`. `interrupt` → `q.interrupt()`. Closing stdin or `close` ends the
+includePartialMessages } })`. `Interrupt` → `q.interrupt()`. `Close` or stdin EOF ends the
 input iterable so the query finishes cleanly.
 
 Runner-side process control: the bridge (and the `claude` it spawns) run in a Windows Job
 Object / Unix process group so a hard kill takes down the whole tree.
 
-### 5.3 Runner ⇄ Hub (`WSS /v1/runner`)
+### 5.2 Runner ⇄ Hub (`blue.runner.v1.RunnerService`)
 
-Auth: `Authorization: Bearer <machine token>` on the upgrade request.
+```proto
+service RunnerService {
+  rpc Attach(stream AttachRequest) returns (stream AttachResponse);
+}
+```
 
-Runner → Hub:
+One long-lived bidirectional gRPC stream per runner, opened outbound from the machine.
+Auth: `authorization: Bearer <machine token>` metadata. HTTP/2 keepalive pings every 20 s;
+the runner reconnects with jittered backoff when the stream ends.
 
-| type | payload | notes |
+Runner → hub (`AttachRequest.oneof message`):
+
+| Message | Fields | Notes |
 |---|---|---|
-| `hello` | `machineId, runnerVersion, bridgeVersion, sdkVersion, claudeVersion, os, arch, projects[{name, path}], sessions[{sessionId, claudeSessionId, state, lastSeq}]` | first frame after connect |
-| `event` | `sessionId, seq, turnId?, event` | `seq` is per-session, monotonic; outbox-backed |
-| `raw` | `sessionId, seq, turnId?, message` | raw SDK message (for future web UI); same seq space |
-| `ack` | reply to hub commands | |
+| `Hello` | `protocol_version, versions{runner, bridge, sdk, claude}, os, arch, projects[{name, path}], sessions[{session_id, claude_session_id, state, last_seq}]` | must be first |
+| `RunnerEvent` | `session_id, seq, turn_id, occurred_at, blue.events.v1.SessionEvent event` | `seq` per-session, monotonic, outbox-backed |
+| `CommandResult` | `command_id, ok, error_code, error_message` | reply to a hub `Command` |
 
-Hub → Runner:
+Hub → runner (`AttachResponse.oneof message`):
 
-| type | payload |
+| Message | Fields |
 |---|---|
-| `welcome` | `ackedSeqs{sessionId: seq}` — what the hub already has, so the runner can trim/replay |
-| `session.start` | `sessionId, project, resumeClaudeSessionId?, model?` |
-| `session.prompt` | `sessionId, turnId, text` |
-| `session.interrupt` | `sessionId` |
-| `session.close` | `sessionId` |
-| `events.ack` | `sessionId, upToSeq` — runner deletes outbox rows ≤ seq |
+| `Welcome` | `machine_id, map<session_id, acked_seq>` — runner trims/replays its outbox |
+| `Command` | `command_id` + `oneof { StartSession, SendPrompt, InterruptSession, CloseSession }` |
+| `EventsAck` | `session_id, up_to_seq` — runner deletes outbox rows ≤ seq |
+
+- `StartSession { session_id, project_name, resume_claude_session_id?, model? }`
+- `SendPrompt { session_id, turn_id, text }`
+- `InterruptSession { session_id }`, `CloseSession { session_id }`
 
 Delivery guarantees:
 
 - Runner → hub events are **at-least-once**; hub dedupes on `(session_id, seq)`.
-- Hub → runner commands are idempotent by envelope `id`; runner keeps a short-lived set of
-  processed command ids (persisted in its SQLite).
-- On reconnect, `hello.sessions` + `welcome.ackedSeqs` reconcile state: hub marks sessions it
-  believed running but the runner doesn't know as `failed (runner lost session)`; runner replays
+- Hub → runner commands are idempotent by `command_id`; runner keeps recently processed ids
+  (persisted in its SQLite).
+- On reconnect, `Hello.sessions` + `Welcome.acked_seqs` reconcile state: hub marks sessions it
+  believed running but the runner doesn't know as failed ("runner lost session"); runner replays
   unacked outbox entries.
 
-### 5.4 Client ⇄ Hub (`WSS /v1/client`)
+### 5.3 Client ⇄ Hub (`blue.client.v1.ClientService`)
 
-Used by voice, the CLI, and later the web UI.
+Used by voice, the CLI, and later the web UI (via gRPC-Web from `tonic-web`).
+Auth: `authorization: Bearer <token>` — the voice service token or a user JWT.
 
-Auth: `Authorization: Bearer <token>` — either the voice service token or a user JWT.
-
-Client → Hub (each acked with a result payload):
-
-| type | payload | result |
-|---|---|---|
-| `machines.list` | — | machines with online status + projects |
-| `sessions.list` | `machineId?, activeOnly?` | sessions |
-| `session.create` | `machine, project, instructions, title?` | `sessionId, turnId` |
-| `session.prompt` | `sessionId, instructions` | `turnId` |
-| `session.interrupt` | `sessionId` | — |
-| `session.get` | `sessionId, recentEvents?: n` | session + recent events |
-| `subscribe` | `cursor?, sessionIds?` | then a stream of `event` frames |
-
-`machine` and `project` accept ids or names; the hub resolves names case-insensitively and
-returns `ambiguous` / `not_found` errors with candidates so the voice agent can ask.
-
-Hub → Client:
-
-| type | payload |
+| RPC | Request → Response |
 |---|---|
-| `event` | `cursor, sessionId?, event` — `cursor` is the global `events.id` for resume |
+| `ListMachines` | — → machines with online status + projects |
+| `ListSessions` | `machine?, active_only` → sessions |
+| `CreateSession` | `machine, project, instructions, title?` → `session, turn_id` |
+| `SendPrompt` | `session_id, instructions` → `turn_id` (queued if a turn is running) |
+| `InterruptSession` | `session_id` → — |
+| `GetSession` | `session_id, recent_events` → session + recent events |
+| `Subscribe` (server stream) | `cursor?, session_ids[], include_raw` → stream of `Event` |
 
-### 5.5 Event model (translated by the runner)
+`Event { cursor, occurred_at, oneof kind { SessionEventEnvelope session, MachineStatus machine_status } }`.
+`cursor` is the global `events.id`; a reconnecting subscriber passes its last cursor to resume.
 
-Translation from raw `SDKMessage` lives in `crates/runner/src/translate.rs`, tested against
-recorded fixtures.
+`machine` and `project` accept ids or names; the hub resolves names case-insensitively. Errors
+use gRPC status codes: `NOT_FOUND`, and `FAILED_PRECONDITION` for ambiguity, with an
+`AmbiguousTarget { candidates[] }` message in the status details so the voice agent can ask.
 
-| Event | From | Fields |
+### 5.4 Auth (`blue.auth.v1.AuthService`)
+
+| RPC | Auth | Purpose |
 |---|---|---|
-| `session.started` | `system` / `init` | `claudeSessionId, model, cwd` |
-| `turn.started` | runner, on prompt sent | `turnId` |
-| `assistant.text` | `assistant` text blocks | `text` (complete block, not partials) |
-| `tool.started` | `assistant` tool_use blocks | `toolUseId, tool, summary` e.g. `Edit src/main.rs`, `Bash: cargo test` |
-| `tool.finished` | `user` tool_result blocks | `toolUseId, isError` |
-| `turn.completed` | `result` (success) | `turnId, resultText, durationMs, numTurns, costUsd?` |
-| `turn.failed` | `result` (error) / bridge crash | `turnId, reason` |
-| `turn.interrupted` | after interrupt | `turnId` |
-| `session.state` | runner | `state: starting \| idle \| running \| closed \| failed` |
-| `machine.status` | hub | `machineId, online` |
+| `Login` | — | username/password → short-lived user JWT |
+| `CreateLiveKitToken` | user JWT | mint a room token with agent dispatch for `blue-voice` |
+| `CreatePairingCode` | user JWT | one-time code, 10 min TTL |
+| `ClaimPairingCode` | the code | runner exchanges code + machine name → `machine_id`, machine token |
+| `RevokeMachine` | user JWT | revoke a machine token and drop its stream |
 
-Partial stream events (`stream_event`) are not translated; they ride along as `raw` only.
-Unknown SDK message types are logged and forwarded as `raw`, never fatal.
+### 5.5 Event model (`blue.events.v1.SessionEvent`)
+
+The runner translates raw `SDKMessage` JSON into `SessionEvent` (`crates/runner/src/translate.rs`,
+tested against recorded fixtures). `SessionEvent` is a `oneof`:
+
+| Variant | From | Fields |
+|---|---|---|
+| `SessionStarted` | SDK `system` / `init` | `claude_session_id, model, cwd` |
+| `TurnStarted` | runner, on prompt sent | `turn_id` |
+| `AssistantText` | SDK `assistant` text blocks | `text` (complete block, not partials) |
+| `ToolStarted` | SDK `assistant` tool_use blocks | `tool_use_id, tool, summary` e.g. `Edit src/main.rs`, `Bash: cargo test` |
+| `ToolFinished` | SDK `user` tool_result blocks | `tool_use_id, is_error` |
+| `TurnCompleted` | SDK `result` (success) | `turn_id, result_text, duration_ms, num_turns, cost_usd` |
+| `TurnFailed` | SDK `result` (error) / bridge crash | `turn_id, reason` |
+| `TurnInterrupted` | after interrupt | `turn_id` |
+| `SessionStateChanged` | runner | `SessionState` enum: `STARTING, IDLE, RUNNING, CLOSED, FAILED` |
+| `RawSdkMessage` | every SDK message (if `forward_raw`) | `json` |
+
+`MachineStatus { machine_id, online }` is produced by the hub, not the runner, and lives in
+`blue.client.v1.Event`. Partial stream events (`stream_event`) are only forwarded as
+`RawSdkMessage`. Unknown SDK message types are logged and forwarded raw, never fatal.
 
 ---
 
@@ -286,7 +324,7 @@ Unknown SDK message types are logged and forwarded as `raw`, never fatal.
 
 ### 6.1 Hub (`crates/hub`, bin `blue-hub`)
 
-**Stack:** tokio, axum (HTTP + WS), sqlx (Postgres, compile-time-checked queries, embedded
+**Stack:** tokio, tonic (gRPC; `tonic-health` for probes, `tonic-web` later for the browser), sqlx (Postgres, compile-time-checked queries, embedded
 migrations), `livekit-api` (token minting), `jsonwebtoken`, `argon2`, `tracing`, `clap`.
 
 **Subcommands** (one image, three roles):
@@ -296,31 +334,25 @@ migrations), `livekit-api` (token minting), `jsonwebtoken`, `argon2`, `tracing`,
 - `blue-hub db migrate` — runs embedded migrations as the app role.
 - `blue-hub admin set-password` — create/update the single user (also seedable from env).
 
-**HTTP endpoints:**
+**gRPC services** (one port, h2c behind the ingress; TLS terminates at the ingress):
 
-| Method | Path | Auth | Purpose |
-|---|---|---|---|
-| GET | `/healthz` | — | liveness |
-| GET | `/readyz` | — | DB reachable, migrations at expected version |
-| POST | `/v1/auth/login` | — | username/password → JWT (short-lived) |
-| POST | `/v1/livekit/token` | user JWT | mint a LiveKit room token with agent dispatch for `blue-voice` |
-| POST | `/v1/pairing/codes` | user JWT | create a one-time pairing code (10 min TTL) |
-| POST | `/v1/pairing/claim` | pairing code | runner exchanges code + machine name → `machineId`, machine token |
-| DELETE | `/v1/machines/{id}` | user JWT | revoke a machine |
-| GET | `/v1/runner` | machine token | WebSocket upgrade |
-| GET | `/v1/client` | voice token / JWT | WebSocket upgrade |
+- `grpc.health.v1.Health` — liveness/readiness (readiness = DB reachable + migrations current);
+  Kubernetes uses native gRPC probes.
+- `blue.auth.v1.AuthService`, `blue.client.v1.ClientService`, `blue.runner.v1.RunnerService`
+  (§5). An interceptor maps the bearer token to a principal (user / voice / machine) and each
+  RPC checks the principal kind it requires.
 
 **Internals:**
 
-- `routing::Registry` — in-memory map `machineId → runner connection handle` (mpsc sender);
+- `routing::Registry` — in-memory map `machineId → runner stream handle` (mpsc sender);
   online/offline derived from it and broadcast as `machine.status`.
 - `routing::Fanout` — `tokio::sync::broadcast` of persisted events to client subscribers;
   slow subscribers get dropped and resume from their cursor.
-- Write path: runner `event` → insert (`ON CONFLICT DO NOTHING` on `(session_id, seq)`) →
+- Write path: `RunnerEvent` → insert (`ON CONFLICT DO NOTHING` on `(session_id, seq)`) →
   update session/turn rows → broadcast → `events.ack` to runner.
 - Turn queue: if a `session.prompt` arrives while a turn is running, it is persisted as
   `queued` and dispatched on the next `turn.completed`/`failed`/`interrupted`.
-- Graceful shutdown on SIGTERM: stop accepting, send close frames, flush, exit.
+- Graceful shutdown on SIGTERM: health → NOT_SERVING, end runner/client streams, flush, exit.
 
 **Config (env):** `BLUE_DATABASE_URL`, `BLUE_PUBLIC_URL`, `BLUE_JWT_SECRET`,
 `BLUE_VOICE_TOKEN` (compared in constant time; stored hashed at startup),
@@ -382,11 +414,11 @@ restricted permissions.
 
 **Internals:**
 
-- `hub_conn` — connect, `hello`, reconnect with jittered exponential backoff, dispatch
+- `hub_conn` — tonic client, open `Attach`, send `Hello`, reconnect with jittered exponential backoff, dispatch
   commands, drain outbox.
 - `supervisor` — `sessionId → SessionActor`. Each actor owns a bridge child process, its
   stdin writer, a stdout reader task, current turn, and the `claudeSessionId`.
-- `bridge_proc` — spawn in a Job Object / process group, line-framed IO, kill-tree on drop.
+- `bridge_proc` — spawn in a Job Object / process group, size-delimited protobuf IO, kill-tree on drop.
 - `translate` — raw `SDKMessage` → events (§5.5); pure function, fixture-tested.
 - `outbox` — SQLite (`sqlx` sqlite): `(session_id, seq, payload)`; append before send,
   delete on `events.ack`. Also stores `sessions(session_id, claude_session_id, project)` so a
@@ -400,15 +432,16 @@ restricted permissions.
 
 ### 6.4 Bridge (`bridge/`, exe `claude-bridge`)
 
-- Bun + TypeScript; depends only on `@anthropic-ai/claude-agent-sdk` (pinned exact version).
-- ~200 lines: read NDJSON from stdin, validate against generated types, one `query()` per
+- Bun + TypeScript; depends only on `@anthropic-ai/claude-agent-sdk` (pinned exact version) and
+  `@bufbuild/protobuf`.
+- ~200 lines: decode size-delimited `BridgeInput` frames from stdin, one `query()` per
   process, async-iterable input queue for prompts, forward every yielded message as
-  `sdk_message`, handle `interrupt`/`close`, emit `exited`.
+  `SdkMessage { json }`, handle `Interrupt`/`Close`, emit `Exited`.
 - Always passes `pathToClaudeCodeExecutable` (the runner supplies the installed `claude`), so
   the bundled-CLI resolution inside the SDK is never relied on.
 - Built with `bun build --compile` for `bun-windows-x64`, `bun-darwin-arm64`,
   `bun-darwin-x64`, `bun-linux-x64`, `bun-linux-arm64`; shipped next to `blue-runner`.
-- `--replay <fixture.ndjson>` mode: emits a recorded stream instead of calling the SDK, for
+- `--replay <fixture>` mode: emits a recorded stream instead of calling the SDK, for
   runner tests and CI without Claude credentials.
 
 ### 6.5 Voice agent (`voice/`, Python)
@@ -421,8 +454,8 @@ restricted permissions.
 - Deployed with `lk agent create` / `lk agent deploy` from `voice/`. Secrets in LiveKit
   Cloud: `BLUE_HUB_URL`, `BLUE_VOICE_TOKEN`.
 
-**Per-job state:** one `HubClient` (WebSocket to `/v1/client`, auto-reconnect, resumes from
-last cursor), a "focused session" id, and a notification queue.
+**Per-job state:** one `HubClient` (`grpc.aio` channel to `ClientService`; `Subscribe` stream
+auto-reconnects and resumes from its last cursor), a "focused session" id, and a notification queue.
 
 **Tools** (`@function_tool`):
 
@@ -430,10 +463,10 @@ last cursor), a "focused session" id, and a notification queue.
 |---|---|
 | `list_machines()` | machines, online status, projects |
 | `list_sessions(active_only=True)` | sessions with machine, project, state |
-| `start_task(machine, project, instructions)` | `session.create`; focuses the new session |
-| `send_follow_up(instructions, session=None)` | `session.prompt` to focused or named session |
-| `get_status(session=None)` | `session.get` with recent events; LLM summarizes |
-| `interrupt(session=None)` | `session.interrupt` |
+| `start_task(machine, project, instructions)` | `CreateSession`; focuses the new session |
+| `send_follow_up(instructions, session=None)` | `SendPrompt` to focused or named session |
+| `get_status(session=None)` | `GetSession` with recent events; LLM summarizes |
+| `interrupt(session=None)` | `InterruptSession` |
 | `focus_session(session)` | change focus by name/title/number |
 
 **Behavior (system prompt essentials):**
@@ -446,15 +479,15 @@ last cursor), a "focused session" id, and a notification queue.
 - Acknowledge dispatch in a few words. Never read code, diffs, or paths character by character.
 - Stay silent during progress unless asked.
 
-**Notifications (`notifier.py`):** subscribes to hub events. On `turn.completed` /
-`turn.failed` / `machine.status offline` with a running session, enqueue a notification.
+**Notifications (`notifier.py`):** subscribes to hub events. On `TurnCompleted` /
+`TurnFailed` / `MachineStatus{online=false}` with a running session, enqueue a notification.
 When neither the user nor the agent is speaking, deliver it via
 `session.generate_reply(instructions=…)` with the (truncated) `resultText` and the instruction
 to summarize in ≤2 sentences. Multiple pending notifications are coalesced.
 
 ### 6.6 CLI (`crates/cli`, bin `blue`)
 
-Text client over the same client protocol, plus admin HTTP calls:
+Text client over the same gRPC services (`ClientService` + `AuthService`):
 
 - `blue login`, `blue pair-code`, `blue machines [revoke <name>]`
 - `blue run <machine> <project> "<instructions>"` — create session, stream events to terminal
@@ -498,8 +531,8 @@ Permissions are wide open on the machines, so **hub auth is the security boundar
 
 - Pairing codes: single-use, 10-minute TTL, hashed at rest.
 - Machine tokens revocable; revocation closes the live connection.
-- Rate limiting on `/v1/auth/login` and `/v1/pairing/claim`.
-- TLS everywhere via cert-manager on ingress; runners refuse `http://` hubs except
+- Rate limiting on `AuthService.Login` and `AuthService.ClaimPairingCode`.
+- TLS everywhere via cert-manager on ingress; runners refuse plaintext hubs except
   `localhost`.
 - Runner-side project allowlist: Claude only ever starts in configured project directories.
 - Audit log of logins, pairings, revocations, session creates.
@@ -513,10 +546,11 @@ Target: self-run cluster (k3s assumed). Generic enough for others.
 **Templates:**
 
 - `deployment.yaml` — 1 replica, `strategy: Recreate`, non-root, read-only root FS,
-  probes on `/healthz` and `/readyz`, `terminationGracePeriodSeconds: 30`.
-- `service.yaml` — ClusterIP.
+  native gRPC liveness/readiness probes (`grpc.health.v1`), `terminationGracePeriodSeconds: 30`.
+- `service.yaml` — ClusterIP, `appProtocol: kubernetes.io/h2c` and the Traefik
+  `traefik.ingress.kubernetes.io/service.serversscheme: h2c` annotation so gRPC is proxied over HTTP/2.
 - `ingress.yaml` — default `ingressClassName: traefik`, cert-manager annotation from values;
-  optional ingress-nginx timeout annotations.
+  optional ingress-nginx `backend-protocol: "GRPC"` + timeout annotations.
 - `httproute.yaml` — optional Gateway API alternative.
 - `secret-app.yaml` — generated JWT secret, voice token, DB app password; uses `lookup` to
   keep values stable across upgrades; created as a pre-install hook (weight −20) with
@@ -525,7 +559,7 @@ Target: self-run cluster (k3s assumed). Generic enough for others.
   `blue-hub db bootstrap`, the only pod that mounts the admin DSN Secret.
 - `job-db-migrate.yaml` — `pre-install,pre-upgrade` hook, weight 0, `blue-hub db migrate`.
 - `serviceaccount.yaml`, `NOTES.txt` (prints the hub URL, how to get the voice token, how to
-  pair a runner), `tests/test-connection.yaml` (`helm test` hits `/readyz`).
+  pair a runner), `tests/test-connection.yaml` (`helm test` runs a gRPC health check).
 - `values.schema.json` — validates values.
 
 **Values sketch:**
@@ -591,7 +625,7 @@ k3d (for chart testing), Helm.
 | `just bridge` | `bun build --compile` the bridge into `target/debug/` |
 | `just runner` | `blue-runner start` against `http://localhost:8080` |
 | `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local hub directly (no tunnel needed) |
-| `just codegen` | regenerate `schema/`, TS and Python protocol types |
+| `just proto` | `buf lint` + regenerate TS and Python protocol code (Rust regenerates on build) |
 | `just test` | cargo tests, bridge typecheck + tests, voice tests |
 | `just chart-test` | k3d cluster + in-cluster Postgres + `helm install` + `helm test` |
 
@@ -604,11 +638,12 @@ Frontend during development: LiveKit Agents Playground, connecting with a token 
 
 - **Translation:** recorded raw SDK streams in `bridge/fixtures/*.ndjson` (captured in phase
   1 from the real `claude`), run through `translate.rs`, snapshot-tested with `insta`.
-- **Protocol:** serde round-trip tests; schema freshness check in CI.
+- **Protocol:** `buf lint`; framing round-trip tests in Rust and TS; Python import/round-trip
+  test; generated-code freshness check in CI; cross-language handshake (runner ⇄ compiled bridge).
 - **Runner:** integration tests using `claude-bridge --replay` — multi-turn, interrupt, bridge
   crash + resume, outbox replay after a dropped hub connection.
 - **Hub:** integration tests against real Postgres (`testcontainers`), with an in-process fake
-  runner and fake client over real WebSockets: routing, dedupe, turn queueing, reconnect
+  runner and fake client over real gRPC streams: routing, dedupe, turn queueing, reconnect
   reconciliation, auth failures.
 - **Bootstrap/migrations:** test against a fresh Postgres with a non-superuser admin that has
   only `CREATEROLE CREATEDB`.
@@ -628,7 +663,7 @@ scope now.
 
 - **ci.yml** (PRs + main): `cargo fmt --check`, `clippy -D warnings`, `cargo test` (with
   Postgres service), bridge `tsc --noEmit` + tests, voice `ruff` + `pyright` + `pytest`,
-  `just codegen && git diff --exit-code`, `helm lint` + `ct lint`.
+  `buf lint`, `just proto && git diff --exit-code`, `helm lint` + `ct lint`.
 - **chart-e2e.yml**: k3d + Postgres + install chart + `helm test`.
 - **release.yml** (tag `v*`):
   - hub image → `ghcr.io/<owner>/blue-hub:<version>` (amd64 + arm64)
@@ -644,9 +679,10 @@ One version number for the whole repo.
 ## 13. Phases and exit criteria
 
 **Phase 0 — Scaffold**
-Cargo workspace with empty crates, `bridge/` (bun), `voice/` (uv), `justfile`, `schema-gen`
-+ codegen pipeline wired end to end with a trivial type, CI skeleton green, GitHub repo.
-*Exit:* `just test` and CI pass; a type added in Rust shows up in TS and Python.
+Cargo workspace, `proto/` with the v1 definitions, codegen for Rust/TS/Python, `bridge/`
+(bun) answering the protobuf handshake, `voice/` (uv) skeleton, `justfile`, CI, GitHub repo.
+*Exit:* `just test` and CI pass; `blue-runner doctor` spawns the bun-compiled bridge and gets a
+`Ready` frame over protobuf; `blue health` gets SERVING from `blue-hub serve`.
 
 **Phase 1 — Runner ⇄ bridge on Windows (riskiest first)**
 Bridge implemented; Rust spawns it, runs a multi-turn session in a scratch repo, interrupts,
@@ -696,7 +732,7 @@ Technology decided then.
 | Agent SDK message shapes change | Pin SDK version; bridge forwards raw; lenient translation; fixtures + snapshot tests; deliberate upgrades |
 | `bun build --compile` incompatibility with the SDK | Verify in phase 1; fallback: ship bridge as bundled JS + require Node, or Node SEA |
 | Orphaned `claude` processes on Windows | Job Objects with kill-on-close; tested in phase 1 |
-| Long-lived WebSockets dropped by ingress/LB | 20 s pings; reconnect + outbox replay; documented ingress timeouts |
+| Long-lived gRPC streams dropped by ingress/LB | HTTP/2 keepalive every 20 s; reconnect + outbox replay; documented ingress timeouts |
 | Allow-all permissions + remote voice | Strong hub auth; per-machine tokens; project allowlist; audit log |
 | Voice talks over me / interrupts at bad times | Notifications only when both sides are quiet; coalescing; LiveKit turn detection |
 | Hosted Postgres disallows `CREATE DATABASE` | Manual `bootstrap.sql` path with bootstrap disabled |

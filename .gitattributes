@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.exe binary
+bridge/src/gen/** linguist-generated=true
+voice/src/blue/** linguist-generated=true

@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package blue.bridge.v1;
+
+// Runner <-> claude-bridge protocol over the bridge's stdin/stdout.
+//
+// Framing: every frame is a varint length prefix followed by one encoded message
+// ("size-delimited"). stdout carries only frames; the bridge logs to stderr.
+// One bridge process hosts exactly one session.
+
+// Runner -> bridge.
+message BridgeInput {
+  oneof command {
+    Start start = 1;
+    Prompt prompt = 2;
+    Interrupt interrupt = 3;
+    Close close = 4;
+  }
+}
+
+// Bridge -> runner.
+message BridgeOutput {
+  oneof event {
+    Ready ready = 1;
+    SdkMessage sdk_message = 2;
+    Error error = 3;
+    Exited exited = 4;
+  }
+}
+
+// Starts the Agent SDK query. Must be the first command, sent once.
+message Start {
+  string session_id = 1;
+  // Working directory for Claude (a project path from the runner's allowlist).
+  string cwd = 2;
+  // Path to the installed `claude` executable, passed as pathToClaudeCodeExecutable.
+  string claude_path = 3;
+  // Claude session id to resume, if continuing an existing conversation.
+  optional string resume_claude_session_id = 4;
+  optional string model = 5;
+  bool include_partial_messages = 6;
+}
+
+// Sends one user turn into the running query.
+message Prompt {
+  string turn_id = 1;
+  string text = 2;
+}
+
+// Interrupts the current turn (query.interrupt()).
+message Interrupt {}
+
+// Ends the input stream; the bridge finishes and exits 0.
+message Close {}
+
+// First frame the bridge writes after starting.
+message Ready {
+  uint32 protocol_version = 1;
+  string bridge_version = 2;
+  // Version of @anthropic-ai/claude-agent-sdk the bridge was built with.
+  string sdk_version = 3;
+  // JS runtime version (Bun).
+  string runtime_version = 4;
+}
+
+// One SDKMessage exactly as the SDK yielded it, serialized with JSON.stringify.
+message SdkMessage {
+  string json = 1;
+}
+
+message Error {
+  string message = 1;
+  // A fatal error is followed by Exited.
+  bool fatal = 2;
+}
+
+message Exited {
+  int32 code = 1;
+}

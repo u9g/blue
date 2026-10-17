@@ -1,0 +1,32 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+blue-protocol = { path = "crates/protocol" }
+anyhow = "1"
+bytes = "1"
+clap = { version = "4.6", features = ["derive", "env"] }
+prost = "0.14"
+prost-types = "0.14"
+protoc-bin-vendored = "3.3"
+tokio = { version = "1.53", features = ["full"] }
+tokio-stream = "0.1"
+tonic = "0.14"
+tonic-health = "0.14"
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

@@ -1,0 +1,13 @@
+{
+  "name": "blue",
+  "private": true,
+  "workspaces": ["bridge"],
+  "scripts": {
+    "proto:lint": "buf lint",
+    "proto:ts": "buf generate"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "1.74.0",
+    "@bufbuild/protoc-gen-es": "2.16.0"
+  }
+}
