@@ -8,21 +8,69 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class LoginRequest(_message.Message):
-    __slots__ = ("username", "password")
-    USERNAME_FIELD_NUMBER: _ClassVar[int]
-    PASSWORD_FIELD_NUMBER: _ClassVar[int]
-    username: str
-    password: str
-    def __init__(self, username: _Optional[str] = ..., password: _Optional[str] = ...) -> None: ...
+class User(_message.Message):
+    __slots__ = ("github_id", "github_login", "name", "avatar_url")
+    GITHUB_ID_FIELD_NUMBER: _ClassVar[int]
+    GITHUB_LOGIN_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    AVATAR_URL_FIELD_NUMBER: _ClassVar[int]
+    github_id: int
+    github_login: str
+    name: str
+    avatar_url: str
+    def __init__(self, github_id: _Optional[int] = ..., github_login: _Optional[str] = ..., name: _Optional[str] = ..., avatar_url: _Optional[str] = ...) -> None: ...
 
-class LoginResponse(_message.Message):
-    __slots__ = ("token", "expires_at")
-    TOKEN_FIELD_NUMBER: _ClassVar[int]
+class LoginWithGitHubRequest(_message.Message):
+    __slots__ = ("client_name",)
+    CLIENT_NAME_FIELD_NUMBER: _ClassVar[int]
+    client_name: str
+    def __init__(self, client_name: _Optional[str] = ...) -> None: ...
+
+class LoginWithGitHubResponse(_message.Message):
+    __slots__ = ("device_code", "complete")
+    DEVICE_CODE_FIELD_NUMBER: _ClassVar[int]
+    COMPLETE_FIELD_NUMBER: _ClassVar[int]
+    device_code: DeviceCode
+    complete: LoginComplete
+    def __init__(self, device_code: _Optional[_Union[DeviceCode, _Mapping]] = ..., complete: _Optional[_Union[LoginComplete, _Mapping]] = ...) -> None: ...
+
+class DeviceCode(_message.Message):
+    __slots__ = ("user_code", "verification_uri", "expires_at")
+    USER_CODE_FIELD_NUMBER: _ClassVar[int]
+    VERIFICATION_URI_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
-    token: str
+    user_code: str
+    verification_uri: str
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, token: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, user_code: _Optional[str] = ..., verification_uri: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class LoginComplete(_message.Message):
+    __slots__ = ("session_token", "expires_at", "user")
+    SESSION_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    USER_FIELD_NUMBER: _ClassVar[int]
+    session_token: str
+    expires_at: _timestamp_pb2.Timestamp
+    user: User
+    def __init__(self, session_token: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., user: _Optional[_Union[User, _Mapping]] = ...) -> None: ...
+
+class LogoutRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class LogoutResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetCurrentUserRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class GetCurrentUserResponse(_message.Message):
+    __slots__ = ("user",)
+    USER_FIELD_NUMBER: _ClassVar[int]
+    user: User
+    def __init__(self, user: _Optional[_Union[User, _Mapping]] = ...) -> None: ...
 
 class CreateLiveKitTokenRequest(_message.Message):
     __slots__ = ("room_name",)

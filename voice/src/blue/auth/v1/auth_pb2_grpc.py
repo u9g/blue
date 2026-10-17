@@ -26,7 +26,12 @@ if _version_not_supported:
 
 
 class AuthServiceStub:
-    """Missing associated documentation comment in .proto file."""
+    """Users sign in with GitHub only. The server runs GitHub's OAuth device flow on the client's
+    behalf, checks the GitHub account against its allowlist, and issues a Blue session token.
+    Clients never see a GitHub token.
+
+    Session tokens are sent as `authorization: Bearer <session token>` metadata.
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -34,10 +39,20 @@ class AuthServiceStub:
         Args:
             channel: A grpc.Channel.
         """
-        self.Login = channel.unary_unary(
-                '/blue.auth.v1.AuthService/Login',
-                request_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginRequest.SerializeToString,
-                response_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginResponse.FromString,
+        self.LoginWithGitHub = channel.unary_stream(
+                '/blue.auth.v1.AuthService/LoginWithGitHub',
+                request_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginWithGitHubRequest.SerializeToString,
+                response_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginWithGitHubResponse.FromString,
+                _registered_method=True)
+        self.Logout = channel.unary_unary(
+                '/blue.auth.v1.AuthService/Logout',
+                request_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.LogoutRequest.SerializeToString,
+                response_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.LogoutResponse.FromString,
+                _registered_method=True)
+        self.GetCurrentUser = channel.unary_unary(
+                '/blue.auth.v1.AuthService/GetCurrentUser',
+                request_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.GetCurrentUserRequest.SerializeToString,
+                response_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.GetCurrentUserResponse.FromString,
                 _registered_method=True)
         self.CreateLiveKitToken = channel.unary_unary(
                 '/blue.auth.v1.AuthService/CreateLiveKitToken',
@@ -62,24 +77,47 @@ class AuthServiceStub:
 
 
 class AuthServiceServicer:
-    """Missing associated documentation comment in .proto file."""
+    """Users sign in with GitHub only. The server runs GitHub's OAuth device flow on the client's
+    behalf, checks the GitHub account against its allowlist, and issues a Blue session token.
+    Clients never see a GitHub token.
 
-    def Login(self, request, context):
-        """Username/password -> short-lived user JWT.
+    Session tokens are sent as `authorization: Bearer <session token>` metadata.
+    """
+
+    def LoginWithGitHub(self, request, context):
+        """Signs in with GitHub. The first response carries the code to enter at GitHub; the server
+        then polls GitHub and sends a final response with the session token.
+
+        Errors: PERMISSION_DENIED if the GitHub account is not allowed, DEADLINE_EXCEEDED if the
+        code expires, ABORTED if the user declines on GitHub.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Logout(self, request, context):
+        """Revokes the calling session token.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetCurrentUser(self, request, context):
+        """Returns the signed-in user. Requires a session token.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def CreateLiveKitToken(self, request, context):
-        """Mints a LiveKit room token that dispatches the voice agent. Requires a user JWT.
+        """Mints a LiveKit room token that dispatches the voice agent. Requires a session token.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def CreatePairingCode(self, request, context):
-        """One-time code for pairing a new daemon. Requires a user JWT.
+        """One-time code for pairing a new daemon. Requires a session token.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -93,7 +131,7 @@ class AuthServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def RevokeMachine(self, request, context):
-        """Revokes a machine token and drops its stream. Requires a user JWT.
+        """Revokes a machine token and drops its stream. Requires a session token.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -102,10 +140,20 @@ class AuthServiceServicer:
 
 def add_AuthServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Login': grpc.unary_unary_rpc_method_handler(
-                    servicer.Login,
-                    request_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginRequest.FromString,
-                    response_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginResponse.SerializeToString,
+            'LoginWithGitHub': grpc.unary_stream_rpc_method_handler(
+                    servicer.LoginWithGitHub,
+                    request_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginWithGitHubRequest.FromString,
+                    response_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.LoginWithGitHubResponse.SerializeToString,
+            ),
+            'Logout': grpc.unary_unary_rpc_method_handler(
+                    servicer.Logout,
+                    request_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.LogoutRequest.FromString,
+                    response_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.LogoutResponse.SerializeToString,
+            ),
+            'GetCurrentUser': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCurrentUser,
+                    request_deserializer=blue_dot_auth_dot_v1_dot_auth__pb2.GetCurrentUserRequest.FromString,
+                    response_serializer=blue_dot_auth_dot_v1_dot_auth__pb2.GetCurrentUserResponse.SerializeToString,
             ),
             'CreateLiveKitToken': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateLiveKitToken,
@@ -136,10 +184,42 @@ def add_AuthServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class AuthService:
-    """Missing associated documentation comment in .proto file."""
+    """Users sign in with GitHub only. The server runs GitHub's OAuth device flow on the client's
+    behalf, checks the GitHub account against its allowlist, and issues a Blue session token.
+    Clients never see a GitHub token.
+
+    Session tokens are sent as `authorization: Bearer <session token>` metadata.
+    """
 
     @staticmethod
-    def Login(request,
+    def LoginWithGitHub(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/blue.auth.v1.AuthService/LoginWithGitHub',
+            blue_dot_auth_dot_v1_dot_auth__pb2.LoginWithGitHubRequest.SerializeToString,
+            blue_dot_auth_dot_v1_dot_auth__pb2.LoginWithGitHubResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Logout(request,
             target,
             options=(),
             channel_credentials=None,
@@ -152,9 +232,36 @@ class AuthService:
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/blue.auth.v1.AuthService/Login',
-            blue_dot_auth_dot_v1_dot_auth__pb2.LoginRequest.SerializeToString,
-            blue_dot_auth_dot_v1_dot_auth__pb2.LoginResponse.FromString,
+            '/blue.auth.v1.AuthService/Logout',
+            blue_dot_auth_dot_v1_dot_auth__pb2.LogoutRequest.SerializeToString,
+            blue_dot_auth_dot_v1_dot_auth__pb2.LogoutResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetCurrentUser(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/blue.auth.v1.AuthService/GetCurrentUser',
+            blue_dot_auth_dot_v1_dot_auth__pb2.GetCurrentUserRequest.SerializeToString,
+            blue_dot_auth_dot_v1_dot_auth__pb2.GetCurrentUserResponse.FromString,
             options,
             channel_credentials,
             insecure,

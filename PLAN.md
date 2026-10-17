@@ -70,7 +70,7 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
 
 ```
   Browser / phone (Agents Playground, later apps/web)
-        │ WebRTC                                 ▲ HTTPS: login, room token
+        │ WebRTC                                 ▲ GitHub sign-in, room token
         ▼                                        │
   ┌─────────────── LiveKit Cloud ───────────┐    │
   │ SFU  ◀──▶  voice (Python agent job)     │    │
@@ -136,7 +136,7 @@ blue/
 │       ├── bridge/v1/bridge.proto   # daemon ⇄ bridge stdio frames
 │       ├── daemon/v1/daemon.proto   # DaemonService (server ⇄ daemon)
 │       ├── client/v1/client.proto   # ClientService (server ⇄ voice/cli)
-│       └── auth/v1/auth.proto       # AuthService (login, LiveKit tokens, pairing)
+│       └── auth/v1/auth.proto       # AuthService (GitHub login, LiveKit tokens, pairing)
 ├── crates/
 │   ├── protocol/              # generated Rust (tonic/prost, build.rs) + framing helpers
 │   │   └── src/{lib.rs, framing.rs}
@@ -179,7 +179,7 @@ the directory (`blue.daemon.v1`, …); `buf lint` (STANDARD rules) runs in CI.
 | `blue.bridge.v1` | `bridge.proto` | daemon ⇄ bridge stdio |
 | `blue.daemon.v1` | `daemon.proto` | `DaemonService` (server ⇄ daemon) |
 | `blue.client.v1` | `client.proto` | `ClientService` (server ⇄ voice, cli, later web) |
-| `blue.auth.v1` | `auth.proto` | `AuthService` (login, LiveKit tokens, pairing, revocation) |
+| `blue.auth.v1` | `auth.proto` | `AuthService` (GitHub login, LiveKit tokens, pairing, revocation) |
 
 Generated code:
 
@@ -267,7 +267,7 @@ Delivery guarantees:
 ### 5.3 Client ⇄ Server (`blue.client.v1.ClientService`)
 
 Used by voice, the CLI, and later the web UI (via gRPC-Web from `tonic-web`).
-Auth: `authorization: Bearer <token>` — the voice service token or a user JWT.
+Auth: `authorization: Bearer <token>` — the voice service token or a user session token.
 
 | RPC | Request → Response |
 |---|---|
@@ -288,13 +288,40 @@ use gRPC status codes: `NOT_FOUND`, and `FAILED_PRECONDITION` for ambiguity, wit
 
 ### 5.4 Auth (`blue.auth.v1.AuthService`)
 
+**GitHub is the only way to sign in.** There are no passwords. The server is registered as a
+GitHub OAuth App and runs GitHub's
+[device flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow)
+on the client's behalf, so clients never handle GitHub tokens or OAuth secrets:
+
+1. Client calls `LoginWithGitHub` (a server-streaming RPC).
+2. Server requests a device code from GitHub and streams back `DeviceCode { user_code,
+   verification_uri, expires_at }`. The CLI prints it (and opens the browser).
+3. User enters the code at `github.com/login/device` and approves.
+4. Server polls GitHub at the interval GitHub specifies, receives an access token, calls
+   `GET /user`, then **discards the GitHub token**.
+5. If the GitHub user id is in the allowlist, the server creates a Blue session and streams
+   `LoginComplete { session_token, expires_at, user }`. Otherwise `PERMISSION_DENIED`.
+
+The OAuth App requests no scopes; `/user` works without any. Device flow needs only the
+client id (no secret). The allowlist is by GitHub numeric user id, which survives username
+changes (`gh api user -q .id`).
+
+A browser web UI (phase 7) would use the standard redirect flow instead, which needs the
+client secret and one plain HTTPS callback endpoint on the server (GitHub redirects the browser
+there, so it can't be gRPC). The session token it issues is the same.
+
 | RPC | Auth | Purpose |
 |---|---|---|
-| `Login` | — | username/password → short-lived user JWT |
-| `CreateLiveKitToken` | user JWT | mint a room token with agent dispatch for `blue-voice` |
-| `CreatePairingCode` | user JWT | one-time code, 10 min TTL |
+| `LoginWithGitHub` (server stream) | — | device flow → `DeviceCode`, then `LoginComplete` with a session token |
+| `Logout` | session token | revoke the calling session |
+| `GetCurrentUser` | session token | who am I |
+| `CreateLiveKitToken` | session token | mint a room token with agent dispatch for `blue-voice` |
+| `CreatePairingCode` | session token | one-time code, 10 min TTL |
 | `ClaimPairingCode` | the code | daemon exchanges code + machine name → `machine_id`, machine token |
-| `RevokeMachine` | user JWT | revoke a machine token and drop its stream |
+| `RevokeMachine` | session token | revoke a machine token and drop its stream |
+
+Session tokens are opaque random values stored hashed in Postgres (not JWTs), so `Logout` and
+revocation take effect immediately. Default lifetime 30 days.
 
 ### 5.5 Event model (`blue.events.v1.SessionEvent`)
 
@@ -325,14 +352,14 @@ tested against recorded fixtures). `SessionEvent` is a `oneof`:
 ### 6.1 Server (`crates/server`, bin `blue-server`)
 
 **Stack:** tokio, tonic (gRPC; `tonic-health` for probes, `tonic-web` later for the browser), sqlx (Postgres, compile-time-checked queries, embedded
-migrations), `livekit-api` (token minting), `jsonwebtoken`, `argon2`, `tracing`, `clap`.
+migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/user`), `tracing`,
+`clap`.
 
 **Subcommands** (one image, three roles):
 
 - `blue-server serve` — the server.
 - `blue-server db bootstrap` — uses the admin DSN to create role + database (§7).
 - `blue-server db migrate` — runs embedded migrations as the app role.
-- `blue-server admin set-password` — create/update the single user (also seedable from env).
 
 **gRPC services** (one port, h2c behind the ingress; TLS terminates at the ingress):
 
@@ -354,15 +381,20 @@ migrations), `livekit-api` (token minting), `jsonwebtoken`, `argon2`, `tracing`,
   `queued` and dispatched on the next `turn.completed`/`failed`/`interrupted`.
 - Graceful shutdown on SIGTERM: health → NOT_SERVING, end daemon/client streams, flush, exit.
 
-**Config (env):** `BLUE_DATABASE_URL`, `BLUE_PUBLIC_URL`, `BLUE_JWT_SECRET`,
+**Config (env):** `BLUE_DATABASE_URL`, `BLUE_PUBLIC_URL`,
 `BLUE_VOICE_TOKEN` (compared in constant time; stored hashed at startup),
-`BLUE_ADMIN_USERNAME`, `BLUE_ADMIN_PASSWORD_HASH`, `LIVEKIT_URL`, `LIVEKIT_API_KEY`,
-`LIVEKIT_API_SECRET`, `BLUE_AGENT_NAME` (default `blue-voice`), `RUST_LOG`.
+`BLUE_GITHUB_CLIENT_ID`, `BLUE_GITHUB_CLIENT_SECRET` (only needed for the phase 7 web flow),
+`BLUE_GITHUB_ALLOWED_USER_IDS` (comma-separated), `BLUE_SESSION_TTL` (default `30d`),
+`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `BLUE_AGENT_NAME` (default
+`blue-voice`), `RUST_LOG`.
 
 ### 6.2 Database schema (Postgres)
 
 ```
-users          (id, username UNIQUE, password_hash, created_at)
+users          (id, github_id BIGINT UNIQUE, github_login, name, avatar_url,
+                created_at, last_login_at)
+user_sessions  (id, user_id FK, token_hash UNIQUE, client_name, created_at,
+                last_used_at, expires_at, revoked_at)
 machines       (id, name UNIQUE, token_hash, os, arch, daemon_version, bridge_version,
                 sdk_version, claude_version, created_at, last_seen_at, revoked_at)
 pairing_codes  (code_hash PK, created_by, expires_at, claimed_at, machine_id)
@@ -489,7 +521,9 @@ to summarize in ≤2 sentences. Multiple pending notifications are coalesced.
 
 Text client over the same gRPC services (`ClientService` + `AuthService`):
 
-- `blue login`, `blue pair-code`, `blue machines [revoke <name>]`
+- `blue login` (GitHub device flow; prints the code and opens github.com/login/device),
+  `blue logout`, `blue whoami`; the session token is kept in the OS keyring
+- `blue pair-code`, `blue machines [revoke <name>]`
 - `blue run <machine> <project> "<instructions>"` — create session, stream events to terminal
 - `blue send <session> "<instructions>"`, `blue interrupt <session>`, `blue sessions`,
   `blue tail [--session]`
@@ -524,14 +558,15 @@ Permissions are wide open on the machines, so **server auth is the security boun
 
 | Principal | Credential | Storage |
 |---|---|---|
-| Me (user) | username + password → short-lived JWT | argon2 hash in DB / Secret |
+| Me (user) | GitHub sign-in (device flow) → Blue session token | allowlisted GitHub user id in config; session token hash in DB; token in OS keyring on the client |
 | Voice agent | static service token | k8s Secret (server) + LiveKit Cloud secret (agent) |
 | Each daemon | per-machine token from pairing | hash in DB; plaintext in OS keyring on machine |
 | LiveKit room | room token minted by server after login | — |
 
+- No passwords anywhere. GitHub tokens are used once to read `/user` and never stored.
 - Pairing codes: single-use, 10-minute TTL, hashed at rest.
 - Machine tokens revocable; revocation closes the live connection.
-- Rate limiting on `AuthService.Login` and `AuthService.ClaimPairingCode`.
+- Rate limiting on `AuthService.LoginWithGitHub` and `AuthService.ClaimPairingCode`.
 - TLS everywhere via cert-manager on ingress; daemons refuse plaintext servers except
   `localhost`.
 - Daemon-side project allowlist: Claude only ever starts in configured project directories.
@@ -552,7 +587,7 @@ Target: self-run cluster (k3s assumed). Generic enough for others.
 - `ingress.yaml` — default `ingressClassName: traefik`, cert-manager annotation from values;
   optional ingress-nginx `backend-protocol: "GRPC"` + timeout annotations.
 - `httproute.yaml` — optional Gateway API alternative.
-- `secret-app.yaml` — generated JWT secret, voice token, DB app password; uses `lookup` to
+- `secret-app.yaml` — generated voice token and DB app password; uses `lookup` to
   keep values stable across upgrades; created as a pre-install hook (weight −20) with
   `helm.sh/resource-policy: keep`. Skipped when `existingSecret` is set.
 - `job-db-bootstrap.yaml` — `pre-install,pre-upgrade` hook, weight −10, runs
@@ -592,8 +627,12 @@ livekit:
   existingSecret: ""           # keys: apiKey, apiSecret
   agentName: blue-voice
 auth:
-  adminUsername: jason
-  existingSecret: ""           # keys: adminPasswordHash, jwtSecret, voiceToken
+  github:
+    clientId: ""               # GitHub OAuth App with device flow enabled
+    allowedUserIds: []         # e.g. [12345678]  (gh api user -q .id)
+    existingSecret: ""         # key: clientSecret (optional until the web UI)
+  sessionTtl: 30d
+  existingSecret: ""           # key: voiceToken
 resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { memory: 256Mi } }
 ```
 
@@ -720,7 +759,8 @@ for all targets.
 the next prompt.
 
 **Phase 7 — Web UI (later)**
-Login, LiveKit client (JS SDK), live transcript, session/event view from `raw` events.
+GitHub sign-in (redirect flow), LiveKit client (JS SDK), live transcript, session/event view
+from `raw` events.
 Technology decided then.
 
 ---
@@ -742,8 +782,10 @@ Technology decided then.
 
 ## 15. Open questions (none block phases 0–3)
 
-1. GitHub owner/name/visibility for the repo (needed for phase 0 CI and GHCR paths).
-2. Server hostname and the cluster's cert-manager `ClusterIssuer` name.
-3. Cluster node architecture (amd64, arm64, or both).
-4. Hosted Postgres provider (to confirm `CREATEROLE`/`CREATEDB` are available).
-5. LiveKit Cloud project to use.
+1. ~~GitHub repo~~ — `u9g/blue` (private).
+2. A GitHub OAuth App for sign-in (github.com/settings/developers → New OAuth App, enable
+   device flow) and your GitHub user id for the allowlist. Needed in phase 2.
+3. Server hostname and the cluster's cert-manager `ClusterIssuer` name.
+4. Cluster node architecture (amd64, arm64, or both).
+5. Hosted Postgres provider (to confirm `CREATEROLE`/`CREATEDB` are available).
+6. LiveKit Cloud project to use.
