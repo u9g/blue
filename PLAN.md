@@ -411,7 +411,7 @@ machines       (id, name UNIQUE, token_hash, os, arch, daemon_version, bridge_ve
 pairing_codes  (code_hash PK, created_by, expires_at, claimed_at, machine_id)
 sessions       (id, machine_id FK, title, state, claude_session_id,
                 created_at, updated_at, last_activity_at)
-turns          (id, session_id FK, ordinal, instructions, state  -- queued|running|completed|failed|interrupted
+turns          (id, session_id FK, index, instructions, state  -- queued|running|completed|failed|interrupted
                 , result_text, cost_usd, duration_ms, error, created_at, started_at, finished_at)
 events         (id BIGSERIAL PK  -- global cursor
                 , session_id FK, turn_id FK NULL, seq, kind, payload JSONB, is_raw BOOL,

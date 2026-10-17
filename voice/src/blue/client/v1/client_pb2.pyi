@@ -61,22 +61,22 @@ class Session(_message.Message):
     def __init__(self, id: _Optional[str] = ..., machine_id: _Optional[str] = ..., machine_name: _Optional[str] = ..., title: _Optional[str] = ..., state: _Optional[_Union[_events_pb2.SessionState, str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_activity_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., current_turn: _Optional[_Union[Turn, _Mapping]] = ...) -> None: ...
 
 class Turn(_message.Message):
-    __slots__ = ("id", "ordinal", "instructions", "state", "result_text", "started_at", "finished_at")
+    __slots__ = ("id", "index", "instructions", "state", "result_text", "started_at", "finished_at")
     ID_FIELD_NUMBER: _ClassVar[int]
-    ORDINAL_FIELD_NUMBER: _ClassVar[int]
+    INDEX_FIELD_NUMBER: _ClassVar[int]
     INSTRUCTIONS_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     RESULT_TEXT_FIELD_NUMBER: _ClassVar[int]
     STARTED_AT_FIELD_NUMBER: _ClassVar[int]
     FINISHED_AT_FIELD_NUMBER: _ClassVar[int]
     id: str
-    ordinal: int
+    index: int
     instructions: str
     state: TurnState
     result_text: str
     started_at: _timestamp_pb2.Timestamp
     finished_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., ordinal: _Optional[int] = ..., instructions: _Optional[str] = ..., state: _Optional[_Union[TurnState, str]] = ..., result_text: _Optional[str] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., index: _Optional[int] = ..., instructions: _Optional[str] = ..., state: _Optional[_Union[TurnState, str]] = ..., result_text: _Optional[str] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., finished_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Event(_message.Message):
     __slots__ = ("cursor", "occurred_at", "session", "machine_status")

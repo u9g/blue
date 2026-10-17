@@ -50,7 +50,9 @@ message Session {
 
 message Turn {
   string id = 1;
-  uint32 ordinal = 2;
+  // Zero-based position within the session: 0 is the instruction that created it, 1 the first
+  // follow-up, and so on. Orders turns, including queued ones that haven't started.
+  uint32 index = 2;
   string instructions = 3;
   TurnState state = 4;
   string result_text = 5;
