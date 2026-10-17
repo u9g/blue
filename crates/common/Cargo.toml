@@ -1,0 +1,23 @@
+[package]
+name = "blue-common"
+description = "Shared by the Blue daemon and CLI: server connections and credential storage."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tonic.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

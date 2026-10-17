@@ -15,6 +15,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: bun install --frozen-lockfile
       - run: bun run proto:lint
+      # v1 only grows: no field or RPC may be removed or renumbered.
+      - run: bunx buf breaking --against "https://github.com/${{ github.repository }}.git#branch=main"
       - run: bun run proto:ts
       - run: uv sync --locked --project voice
       - run: uv run --project voice python voice/scripts/gen_proto.py
@@ -24,6 +26,17 @@ jobs:
   rust:
     name: Rust
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      # Server tests create a database per test through this admin DSN.
+      BLUE_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v5
       - run: rustup show
@@ -79,3 +92,9 @@ jobs:
       - run: cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge${{ runner.os == 'Windows' && '.exe' || '' }}
       # The daemon driving the compiled bridge through a recorded session (no Claude login).
       - run: cargo test -q -p blue-daemon --test replay -- --ignored
+      # Server + daemon processes end to end, killing each mid-turn. Postgres comes from
+      # postgresql_embedded; the token avoids GitHub API rate limits on its download.
+      - run: cargo build -q -p blue-daemon
+      - run: cargo test -q -p blue-server --test e2e -- --ignored
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

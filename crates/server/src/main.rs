@@ -1,7 +1,10 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 
+use blue_server::config::ServeConfig;
+use blue_server::github::GitHubUser;
 use clap::{Parser, Subcommand};
-use tonic::transport::Server;
+use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -18,6 +21,44 @@ enum Command {
     Serve {
         #[arg(long, env = "BLUE_LISTEN", default_value = "0.0.0.0:50051")]
         listen: SocketAddr,
+        #[command(flatten)]
+        config: Box<ServeConfig>,
+    },
+    /// Database setup.
+    Db {
+        #[command(subcommand)]
+        command: DbCommand,
+    },
+    /// Issue a session token for a GitHub account directly, bypassing GitHub sign-in. For local
+    /// development and first-time setup; needs the database credentials.
+    Token {
+        #[arg(long, env = "BLUE_DATABASE_URL", hide_env_values = true)]
+        database_url: String,
+        /// GitHub numeric user id to sign in as.
+        #[arg(long)]
+        github_id: i64,
+        /// GitHub login to record for a new user.
+        #[arg(long, default_value = "dev")]
+        github_login: String,
+        #[arg(long, default_value = "30d", value_parser = humantime::parse_duration)]
+        ttl: Duration,
+    },
+}
+
+#[derive(Subcommand)]
+enum DbCommand {
+    /// Create the app role and database using an admin DSN (needs CREATEROLE and CREATEDB).
+    /// Idempotent; also resets the role's password to the one in BLUE_DATABASE_URL.
+    Bootstrap {
+        #[arg(long, env = "BLUE_DATABASE_ADMIN_URL", hide_env_values = true)]
+        admin_url: String,
+        #[arg(long, env = "BLUE_DATABASE_URL", hide_env_values = true)]
+        database_url: String,
+    },
+    /// Apply migrations as the app role.
+    Migrate {
+        #[arg(long, env = "BLUE_DATABASE_URL", hide_env_values = true)]
+        database_url: String,
     },
 }
 
@@ -28,22 +69,48 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     match Cli::parse().command {
-        Command::Serve { listen } => serve(listen).await,
+        Command::Serve { listen, config } => {
+            let listener = TcpListener::bind(listen).await?;
+            info!(%listen, "blue-server listening");
+            blue_server::serve(*config, listener, shutdown_signal()).await?;
+            info!("blue-server stopped");
+            Ok(())
+        }
+        Command::Db {
+            command:
+                DbCommand::Bootstrap {
+                    admin_url,
+                    database_url,
+                },
+        } => blue_server::db::bootstrap(&admin_url, &database_url).await,
+        Command::Db {
+            command: DbCommand::Migrate { database_url },
+        } => {
+            blue_server::db::migrate(&database_url).await?;
+            info!("migrations applied");
+            Ok(())
+        }
+        Command::Token {
+            database_url,
+            github_id,
+            github_login,
+            ttl,
+        } => {
+            let db = blue_server::db::connect(&database_url).await?;
+            let user = GitHubUser {
+                id: github_id,
+                login: github_login,
+                name: None,
+                avatar_url: String::new(),
+            };
+            let (token, _, _) =
+                blue_server::services::auth::create_session(&db, ttl, &user, "blue-server token")
+                    .await
+                    .map_err(|status| anyhow::anyhow!("{}", status.message()))?;
+            println!("{token}");
+            Ok(())
+        }
     }
-}
-
-async fn serve(listen: SocketAddr) -> anyhow::Result<()> {
-    // The reporter starts with the overall ("") service SERVING; per-service status is
-    // reported once the Blue services are registered.
-    let (_health_reporter, health_service) = tonic_health::server::health_reporter();
-
-    info!(%listen, "blue-server listening");
-    Server::builder()
-        .add_service(health_service)
-        .serve_with_shutdown(listen, shutdown_signal())
-        .await?;
-    info!("blue-server stopped");
-    Ok(())
 }
 
 async fn shutdown_signal() {

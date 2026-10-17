@@ -8,12 +8,39 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+base64 = "0.22"
+blue-protocol.workspace = true
+chrono.workspace = true
 clap.workspace = true
+getrandom.workspace = true
+hmac = "0.12"
+humantime = "2"
+prost.workspace = true
+prost-types.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "uuid", "chrono", "migrate", "macros", "json"] }
+subtle = "2"
 tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util.workspace = true
 tonic.workspace = true
 tonic-health.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+url = "2"
+uuid.workspace = true
+
+[dev-dependencies]
+axum = "0.8"
+serde_json.workspace = true
+blue-common.workspace = true
+prost-types.workspace = true
+uuid.workspace = true
+tempfile = "3"
+postgresql_embedded = { version = "0.20", default-features = false, features = ["tokio", "theseus", "rustls"] }
 
 [lints]
 workspace = true

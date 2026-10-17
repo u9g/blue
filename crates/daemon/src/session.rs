@@ -10,7 +10,8 @@ use anyhow::{Context, bail};
 use blue_protocol::bridge::v1::{Close, Prompt, Start, bridge_to_daemon, daemon_to_bridge};
 use blue_protocol::daemon::v1::DaemonEvent;
 use blue_protocol::events::v1::{
-    SessionEvent, SessionState, SessionStateChanged, TurnFailed, TurnStarted, session_event::Kind,
+    RawSdkMessage, SessionEvent, SessionState, SessionStateChanged, TurnFailed, TurnStarted,
+    session_event::Kind,
 };
 
 use crate::bridge_proc::BridgeProcess;
@@ -27,6 +28,8 @@ pub struct SessionConfig {
     pub model: Option<String>,
     /// Play back this recording instead of running Claude (see the bridge's replay mode).
     pub replay: Option<PathBuf>,
+    /// Also emit every SDK message verbatim as a `RawSdkMessage` event.
+    pub forward_raw: bool,
 }
 
 pub struct Session {
@@ -38,6 +41,7 @@ pub struct Session {
     turn: Option<String>,
     pending: VecDeque<DaemonEvent>,
     recorder: Option<Recorder>,
+    forward_raw: bool,
     closing: bool,
     exit_error: Option<String>,
     finished: bool,
@@ -65,6 +69,7 @@ impl Session {
             turn: None,
             pending: VecDeque::new(),
             recorder: None,
+            forward_raw: config.forward_raw,
             closing: false,
             exit_error: None,
             finished: false,
@@ -158,6 +163,9 @@ impl Session {
     fn on_sdk_message(&mut self, json: &str) {
         if let Some(recorder) = &mut self.recorder {
             recorder.record(json);
+        }
+        if self.forward_raw {
+            self.emit(Kind::RawSdkMessage(RawSdkMessage { json: json.into() }));
         }
         for kind in self.translator.translate(json, self.turn.as_deref()) {
             let ends_turn = kind.ends_turn();

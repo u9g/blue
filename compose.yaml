@@ -1,0 +1,18 @@
+# Postgres for local development: `just db`. The server creates its own role and database in
+# it with `blue-server db bootstrap` (run by `just server`).
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - blue-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      retries: 15
+
+volumes:
+  blue-postgres:

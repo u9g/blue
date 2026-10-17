@@ -84,6 +84,7 @@ async fn main() -> anyhow::Result<()> {
                 resume_claude_session_id: resume,
                 model,
                 replay,
+                forward_raw: false,
             })
             .await?;
             if let Some(path) = record {

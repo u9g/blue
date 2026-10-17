@@ -5,6 +5,10 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 exe := if os_family() == "windows" { ".exe" } else { "" }
 
+# Local development database (`just db`). Override either for another Postgres.
+export BLUE_DATABASE_ADMIN_URL := env_var_or_default("BLUE_DATABASE_ADMIN_URL", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+export BLUE_DATABASE_URL := env_var_or_default("BLUE_DATABASE_URL", "postgres://blue_server:blue-dev@localhost:5432/blue?sslmode=disable")
+
 default:
     @just --list
 
@@ -82,9 +86,28 @@ test-live: bridge
 record-fixtures: test-live
     cp target/fixtures/*.jsonl crates/daemon/tests/fixtures/
 
-# Run the server locally
+# Server + daemon processes + replaying bridge; kills each mid-turn (no Claude login; own Postgres)
+test-e2e: bridge
+    cargo build -q -p blue-daemon
+    cargo test -q -p blue-server --test e2e -- --ignored
+
+# Postgres 17 for local development, in Docker
+db:
+    docker compose up -d --wait postgres
+
+# Create the database, migrate it, and run the server locally
 server:
+    cargo run -q -p blue-server -- db bootstrap
+    cargo run -q -p blue-server -- db migrate
     cargo run -p blue-server -- serve --listen 127.0.0.1:50051
+
+# Print a session token for local development, without GitHub sign-in (use as BLUE_TOKEN)
+dev-token github_id="1":
+    cargo run -q -p blue-server -- token --github-id {{github_id}}
+
+# Run this machine's daemon against the server it is paired with (`blue-daemon pair` first)
+daemon: bridge
+    cargo run -p blue-daemon -- start --bridge target/bridge/claude-bridge{{exe}}
 
 # gRPC health check against the server
 health:

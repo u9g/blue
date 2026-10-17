@@ -19,6 +19,7 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 | `crates/daemon` | `blue-daemon` local client | Rust |
 | `crates/daemon-test` | `blue-daemon-test` local testing tool (sessions in the terminal, record/replay) | Rust |
 | `crates/cli` | `blue` text client | Rust |
+| `crates/common` | Server connections and token storage shared by the daemon and CLI | Rust |
 | `bridge/` | `claude-bridge` Agent SDK adapter | TypeScript (Bun) |
 | `voice/` | LiveKit voice agent | Python (uv) |
 
@@ -43,9 +44,30 @@ just handshake   # build the bridge exe; daemon completes the protobuf handshake
 just session     # chat with Claude in this terminal via blue-daemon-test (--record / --replay)
 just test-replay # daemon drives the compiled bridge through a recorded session (no login needed)
 just test-live   # real Claude sessions: turns, resume, kill (needs a login; Haiku)
-just server         # run the server on 127.0.0.1:50051
+just test-e2e    # server + daemon processes, killing each mid-turn (no login needed)
+just db          # Postgres 17 in Docker for local development
+just server      # bootstrap + migrate the database, run the server on 127.0.0.1:50051
+just dev-token   # a session token without GitHub sign-in (export it as BLUE_TOKEN)
+just daemon      # run this machine's daemon (pair it first, see below)
 just health      # gRPC health check against the server
 just voice       # run the voice agent as a local dev worker (needs voice/.env.local)
+```
+
+Server tests need Postgres: they use `BLUE_TEST_DATABASE_URL` (an admin DSN) if set, otherwise
+they download and start a throwaway Postgres with `postgresql_embedded`.
+
+## Running it locally
+
+```sh
+just db                                   # or point BLUE_DATABASE_ADMIN_URL at any Postgres
+just server                               # leave running
+export BLUE_TOKEN=$(just dev-token)       # or `blue login` with a GitHub OAuth App configured
+blue pair-code                            # prints a code
+blue-daemon pair --server http://127.0.0.1:50051 --code <code> --name desktop
+just daemon                               # leave running
+blue run desktop "in the blue repo, add a health endpoint"
+blue send "<session title or id>" "also add a test for it"
+blue sessions; blue tail
 ```
 
 Generated TypeScript (`bridge/src/gen`) and Python (`voice/src/blue`) code is committed; CI

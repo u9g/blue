@@ -6,7 +6,7 @@ import "blue/events/v1/events.proto";
 import "google/protobuf/timestamp.proto";
 
 // Server API for clients: the voice agent, the CLI, and later the web UI.
-// Auth: `authorization: Bearer <token>` metadata (voice service token or user JWT).
+// Auth: `authorization: Bearer <token>` metadata (voice service token or user session token).
 service ClientService {
   rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse);
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
@@ -139,6 +139,8 @@ message GetSessionResponse {
 }
 
 message SubscribeRequest {
+  // Last cursor already seen; events after it are sent first. Unset means live events only;
+  // 0 means from the beginning.
   optional uint64 cursor = 1;
   // Empty means all sessions.
   repeated string session_ids = 2;
