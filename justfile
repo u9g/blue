@@ -66,10 +66,6 @@ lint-voice:
 handshake: bridge
     cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge{{exe}}
 
-# Chat with Claude in this terminal via daemon + bridge, no server (e.g. `just session --model haiku`)
-session *args: bridge
-    cargo run -q -p blue-daemon -- session --bridge target/bridge/claude-bridge{{exe}} {{args}}
-
 # Daemon driving the compiled bridge in replay mode (no Claude needed)
 test-replay: bridge
     cargo test -q -p blue-daemon --test replay -- --ignored

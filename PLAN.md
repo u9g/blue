@@ -456,9 +456,6 @@ compiled into the bridge.)
   (Windows service / launchd / systemd user unit).
 - `blue-daemon doctor` — checks: config valid, `claude` installed + version, bridge starts and
   reports a matching protocol version, server reachable and token accepted.
-- `blue-daemon session [--cwd DIR] [--resume ID] [--model M] [--record FILE | --replay FILE]` —
-  a Claude session in the terminal, no server: each line is a prompt, `/quit` to end.
-  For development and for recording test fixtures. (Phase 1; `just session`.)
 
 **Config:** `daemon.toml` in the OS config dir (`%APPDATA%\blue\` on Windows,
 `~/.config/blue/` elsewhere):
@@ -704,7 +701,6 @@ k3d (for chart testing), Helm.
 | `just db` | `docker compose up` Postgres 17 with an admin user |
 | `just server` | `blue-server db bootstrap && db migrate && serve` against local Postgres |
 | `just bridge` | `bun build --compile` the bridge into `target/bridge/` |
-| `just session` | a Claude session in the terminal through daemon + bridge, no server |
 | `just daemon` | `blue-daemon start` against `http://localhost:8080` |
 | `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local server directly (no tunnel needed) |
 | `just proto` | `buf lint` + regenerate TS and Python protocol code (Rust regenerates on build) |
@@ -781,7 +777,9 @@ SDK and an explicit `pathToClaudeCodeExecutable`. Record fixtures. Implement `tr
 *Exit:* a Rust test binary drives three turns + resume against real `claude`;
 translation snapshot tests pass on fixtures; process-tree kill verified on Windows.
 *Result:* all met (`just test-live`, `just test-replay`, snapshot tests). Also added: scouting
-for the working directory (§5.1), `blue-daemon session`, and replay mode in CI.
+for the working directory (§5.1), and replay mode in CI. Sessions are a library API
+(`blue_daemon::session`, used by the tests and, from phase 2, the server connection); the
+binary only exposes `doctor` so far.
 
 **Phase 2 — Server, protocol, daemon, CLI (local)**
 Protocols in `crates/protocol`; server with Postgres, bootstrap, migrations, auth, pairing,
