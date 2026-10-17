@@ -145,10 +145,11 @@ blue/
 │   │   ├── src/{main.rs, config.rs, grpc/, auth/, db/, routing/, livekit.rs}
 │   │   ├── migrations/        # sqlx migrations (embedded)
 │   │   └── Dockerfile
-│   ├── daemon/                # bin: blue-daemon (+ lib for tests)
+│   ├── daemon/                # bin: blue-daemon (+ lib: sessions, used by tests and daemon-test)
 │   │   ├── src/{main.rs, lib.rs, config.rs, server_conn.rs, supervisor.rs, session.rs,
 │   │   │        bridge_proc.rs, translate.rs, recorder.rs, outbox.rs, service.rs, doctor.rs}
 │   │   └── tests/{live.rs, replay.rs, translate_fixtures.rs, fixtures/, snapshots/}
+│   ├── daemon-test/           # bin: blue-daemon-test (local testing tool, not shipped)
 │   └── cli/                   # bin: blue
 ├── bridge/                    # TypeScript: claude-bridge
 │   ├── package.json, tsconfig.json
@@ -704,6 +705,7 @@ k3d (for chart testing), Helm.
 | `just daemon` | `blue-daemon start` against `http://localhost:8080` |
 | `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local server directly (no tunnel needed) |
 | `just proto` | `buf lint` + regenerate TS and Python protocol code (Rust regenerates on build) |
+| `just session` | a Claude session in the terminal via `blue-daemon-test` (`--record` / `--replay`) |
 | `just test` | cargo tests, bridge tests, voice tests |
 | `just test-replay` | daemon ⇄ compiled bridge through a recorded session (no Claude login) |
 | `just test-live` | real Claude sessions (needs a login; Haiku) |
@@ -779,7 +781,10 @@ translation snapshot tests pass on fixtures; process-tree kill verified on Windo
 *Result:* all met (`just test-live`, `just test-replay`, snapshot tests). Also added: scouting
 for the working directory (§5.1), and replay mode in CI. Sessions are a library API
 (`blue_daemon::session`, used by the tests and, from phase 2, the server connection); the
-binary only exposes `doctor` so far.
+`blue-daemon` binary only exposes `doctor` so far. For trying sessions by hand there is a
+separate, unshipped tool: `blue-daemon-test session [--cwd DIR] [--resume ID] [--model M]
+[--record FILE | --replay FILE]` (`just session`), a Claude session in the terminal where each
+line is a prompt and `/quit` ends it.
 
 **Phase 2 — Server, protocol, daemon, CLI (local)**
 Protocols in `crates/protocol`; server with Postgres, bootstrap, migrations, auth, pairing,

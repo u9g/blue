@@ -171,6 +171,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "blue-daemon-test"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blue-daemon",
+ "blue-protocol",
+ "clap",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "blue-protocol"
 version = "0.1.0"
 dependencies = [

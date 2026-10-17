@@ -1,7 +1,7 @@
 // Replay mode (BLUE_BRIDGE_REPLAY=<file>): instead of running Claude, each Prompt plays back the
 // next recorded turn — every SDK message up to and including its `result`. Recordings are the
-// JSON-lines files the daemon's live tests write. Used to test the daemon end to end without
-// Claude.
+// JSON-lines files written by `blue-daemon-test session --record` and the daemon's live tests.
+// Used to test the daemon end to end without Claude.
 
 import { readFileSync } from "node:fs";
 import { send } from "./io.ts";

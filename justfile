@@ -66,6 +66,10 @@ lint-voice:
 handshake: bridge
     cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge{{exe}}
 
+# Chat with Claude in this terminal via blue-daemon-test (add --model, --record <file>, --replay <file>)
+session *args: bridge
+    cargo run -q -p blue-daemon-test -- session --bridge target/bridge/claude-bridge{{exe}} {{args}}
+
 # Daemon driving the compiled bridge in replay mode (no Claude needed)
 test-replay: bridge
     cargo test -q -p blue-daemon --test replay -- --ignored

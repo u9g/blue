@@ -17,6 +17,7 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 | `crates/protocol` | Generated Rust types + stdio framing | Rust |
 | `crates/server` | `blue-server` management server (gRPC) | Rust |
 | `crates/daemon` | `blue-daemon` local client | Rust |
+| `crates/daemon-test` | `blue-daemon-test` local testing tool (sessions in the terminal, record/replay) | Rust |
 | `crates/cli` | `blue` text client | Rust |
 | `bridge/` | `claude-bridge` Agent SDK adapter | TypeScript (Bun) |
 | `voice/` | LiveKit voice agent | Python (uv) |
@@ -39,6 +40,7 @@ just proto       # buf lint + regenerate TS/Python code from proto/
 just lint        # all linters
 just test        # all tests
 just handshake   # build the bridge exe; daemon completes the protobuf handshake with it
+just session     # chat with Claude in this terminal via blue-daemon-test (--record / --replay)
 just test-replay # daemon drives the compiled bridge through a recorded session (no login needed)
 just test-live   # real Claude sessions: turns, resume, kill (needs a login; Haiku)
 just server         # run the server on 127.0.0.1:50051
