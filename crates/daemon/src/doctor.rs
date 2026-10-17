@@ -15,7 +15,7 @@ use tokio::time::timeout;
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub fn default_bridge_path() -> anyhow::Result<PathBuf> {
-    let exe = std::env::current_exe().context("locate blue-runner executable")?;
+    let exe = std::env::current_exe().context("locate blue-daemon executable")?;
     Ok(exe.with_file_name(format!("claude-bridge{}", std::env::consts::EXE_SUFFIX)))
 }
 
@@ -56,7 +56,7 @@ async fn bridge_handshake(bridge: &Path) -> anyhow::Result<Ready> {
     };
     if ready.protocol_version != PROTOCOL_VERSION {
         bail!(
-            "bridge speaks protocol v{}, runner speaks v{PROTOCOL_VERSION}",
+            "bridge speaks protocol v{}, daemon speaks v{PROTOCOL_VERSION}",
             ready.protocol_version
         );
     }

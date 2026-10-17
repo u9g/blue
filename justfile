@@ -62,9 +62,9 @@ lint-voice:
     uv run ruff check
     uv run ruff format --check
 
-# Runner spawns the compiled bridge and completes the protobuf handshake
+# Daemon spawns the compiled bridge and completes the protobuf handshake
 handshake: bridge
-    cargo run -q -p blue-runner -- doctor --bridge target/bridge/claude-bridge{{exe}}
+    cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge{{exe}}
 
 # Run the hub locally
 hub:

@@ -1,4 +1,4 @@
-// claude-bridge: a stdio adapter between blue-runner and the Claude Agent SDK.
+// claude-bridge: a stdio adapter between blue-daemon and the Claude Agent SDK.
 //
 // Reads size-delimited BridgeInput frames from stdin and writes size-delimited BridgeOutput
 // frames to stdout. stdout carries protocol frames only; all logging goes to stderr.

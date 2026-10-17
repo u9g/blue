@@ -13,7 +13,7 @@ export const file_blue_bridge_v1_bridge: GenFile = /*@__PURE__*/
   fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IsEBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEgsKA2N3ZBgCIAEoCRITCgtjbGF1ZGVfcGF0aBgDIAEoCRIlChhyZXN1bWVfY2xhdWRlX3Nlc3Npb25faWQYBCABKAlIAIgBARISCgVtb2RlbBgFIAEoCUgBiAEBEiAKGGluY2x1ZGVfcGFydGlhbF9tZXNzYWdlcxgGIAEoCEIbChlfcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkQggKBl9tb2RlbCInCgZQcm9tcHQSDwoHdHVybl9pZBgBIAEoCRIMCgR0ZXh0GAIgASgJIgsKCUludGVycnVwdCIHCgVDbG9zZSJnCgVSZWFkeRIYChBwcm90b2NvbF92ZXJzaW9uGAEgASgNEhYKDmJyaWRnZV92ZXJzaW9uGAIgASgJEhMKC3Nka192ZXJzaW9uGAMgASgJEhcKD3J1bnRpbWVfdmVyc2lvbhgEIAEoCSIaCgpTZGtNZXNzYWdlEgwKBGpzb24YASABKAkiJwoFRXJyb3ISDwoHbWVzc2FnZRgBIAEoCRINCgVmYXRhbBgCIAEoCCIWCgZFeGl0ZWQSDAoEY29kZRgBIAEoBWIGcHJvdG8z");
 
 /**
- * Runner -> bridge.
+ * Daemon -> bridge.
  *
  * @generated from message blue.bridge.v1.BridgeInput
  */
@@ -56,7 +56,7 @@ export const BridgeInputSchema: GenMessage<BridgeInput> = /*@__PURE__*/
   messageDesc(file_blue_bridge_v1_bridge, 0);
 
 /**
- * Bridge -> runner.
+ * Bridge -> daemon.
  *
  * @generated from message blue.bridge.v1.BridgeOutput
  */
@@ -110,7 +110,7 @@ export type Start = Message<"blue.bridge.v1.Start"> & {
   sessionId: string;
 
   /**
-   * Working directory for Claude (a project path from the runner's allowlist).
+   * Working directory for Claude (a project path from the daemon's allowlist).
    *
    * @generated from field: string cwd = 2;
    */

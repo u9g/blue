@@ -59,7 +59,7 @@ jobs:
       - run: uv run pytest -q
 
   handshake:
-    name: Runner ⇄ compiled bridge handshake (${{ matrix.os }})
+    name: Daemon ⇄ compiled bridge handshake (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -75,4 +75,4 @@ jobs:
         working-directory: bridge
       # `claude` isn't installed on CI runners, so doctor reports it as FAIL; the bridge
       # handshake is what this job checks (doctor exits non-zero if it fails).
-      - run: cargo run -q -p blue-runner -- doctor --bridge target/bridge/claude-bridge${{ runner.os == 'Windows' && '.exe' || '' }}
+      - run: cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge${{ runner.os == 'Windows' && '.exe' || '' }}

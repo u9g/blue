@@ -79,7 +79,7 @@ class AuthServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def CreatePairingCode(self, request, context):
-        """One-time code for pairing a new runner. Requires a user JWT.
+        """One-time code for pairing a new daemon. Requires a user JWT.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

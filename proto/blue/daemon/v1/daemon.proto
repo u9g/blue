@@ -1,27 +1,27 @@
 syntax = "proto3";
 
-package blue.runner.v1;
+package blue.daemon.v1;
 
 import "blue/events/v1/events.proto";
 import "google/protobuf/timestamp.proto";
 
-// Hub <-> runner. Each runner keeps one Attach stream open, dialed outbound from its machine.
+// Hub <-> daemon. Each daemon keeps one Attach stream open, dialed outbound from its machine.
 // Auth: `authorization: Bearer <machine token>` metadata.
-service RunnerService {
+service DaemonService {
   // Bidirectional session stream. The first request must be a Hello.
   rpc Attach(stream AttachRequest) returns (stream AttachResponse);
 }
 
-// Runner -> hub.
+// Daemon -> hub.
 message AttachRequest {
   oneof message {
     Hello hello = 1;
-    RunnerEvent event = 2;
+    DaemonEvent event = 2;
     CommandResult command_result = 3;
   }
 }
 
-// Hub -> runner.
+// Hub -> daemon.
 message AttachResponse {
   oneof message {
     Welcome welcome = 1;
@@ -36,18 +36,18 @@ message Hello {
   string os = 3;
   string arch = 4;
   repeated Project projects = 5;
-  // Sessions this runner currently knows about, for reconciliation after a reconnect.
+  // Sessions this daemon currently knows about, for reconciliation after a reconnect.
   repeated SessionSnapshot sessions = 6;
 }
 
 message Versions {
-  string runner = 1;
+  string daemon = 1;
   string bridge = 2;
   string sdk = 3;
   string claude = 4;
 }
 
-// A directory the runner allows Claude to work in.
+// A directory the daemon allows Claude to work in.
 message Project {
   string name = 1;
   string path = 2;
@@ -57,12 +57,12 @@ message SessionSnapshot {
   string session_id = 1;
   string claude_session_id = 2;
   blue.events.v1.SessionState state = 3;
-  // Highest event seq the runner has produced for this session.
+  // Highest event seq the daemon has produced for this session.
   uint64 last_seq = 4;
 }
 
 // One translated event. Delivered at least once; the hub dedupes on (session_id, seq).
-message RunnerEvent {
+message DaemonEvent {
   string session_id = 1;
   // Per-session, monotonically increasing, starting at 1.
   uint64 seq = 2;
@@ -81,7 +81,7 @@ message CommandResult {
 
 message Welcome {
   string machine_id = 1;
-  // session_id -> highest seq the hub has stored. The runner trims or replays its outbox.
+  // session_id -> highest seq the hub has stored. The daemon trims or replays its outbox.
   map<string, uint64> acked_seqs = 2;
 }
 

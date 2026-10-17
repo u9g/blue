@@ -9,7 +9,7 @@ service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
   // Mints a LiveKit room token that dispatches the voice agent. Requires a user JWT.
   rpc CreateLiveKitToken(CreateLiveKitTokenRequest) returns (CreateLiveKitTokenResponse);
-  // One-time code for pairing a new runner. Requires a user JWT.
+  // One-time code for pairing a new daemon. Requires a user JWT.
   rpc CreatePairingCode(CreatePairingCodeRequest) returns (CreatePairingCodeResponse);
   // Exchanges a pairing code for a machine token. Authenticated by the code itself.
   rpc ClaimPairingCode(ClaimPairingCodeRequest) returns (ClaimPairingCodeResponse);

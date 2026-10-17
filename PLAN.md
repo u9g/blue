@@ -3,12 +3,12 @@
 Voice-driven control of Claude Code running on my own machines.
 
 I talk to a LiveKit voice agent. The agent talks to a central management server (the **hub**).
-The hub routes work to a **runner** on whichever machine should do it. The runner drives the
+The hub routes work to a **daemon** on whichever machine should do it. The daemon drives the
 Claude Agent SDK through a thin TypeScript **bridge**, which runs the local `claude` binary.
 
 This replicates the loop T3 Code uses (host process → `@anthropic-ai/claude-agent-sdk`
 `query()` → `claude` binary over stream-json), but with the host split into a cloud hub and
-per-machine runners that we own, and with voice as the frontend.
+per-machine daemons that we own, and with voice as the frontend.
 
 ---
 
@@ -21,7 +21,7 @@ per-machine runners that we own, and with voice as the frontend.
 - Hear back when work finishes, with a short spoken summary; ask "what's it doing?" any time.
 - Follow up, interrupt, and switch between sessions and machines by voice.
 - Multiple machines, each connecting outbound to the hub (no inbound ports, works behind NAT).
-- Sessions survive hub restarts, runner restarts, and network drops.
+- Sessions survive hub restarts, daemon restarts, and network drops.
 - Hub is a Helm chart deployable to a self-run Kubernetes cluster, backed by external Postgres.
 
 **Non-goals (for now)**
@@ -40,7 +40,7 @@ per-machine runners that we own, and with voice as the frontend.
 |---|---|---|
 | `voice` — LiveKit agent | **Python** | `livekit-agents` (Python), hosted on LiveKit Cloud |
 | `hub` — management server | **Rust** | ours; deployed to k8s via Helm |
-| `runner` — local client | **Rust** | ours; all content flows through it |
+| `daemon` — local client | **Rust** | ours; all content flows through it |
 | `claude-bridge` — SDK adapter | **TypeScript** | the minimum needed to use `@anthropic-ai/claude-agent-sdk` |
 | `cli` — text client | **Rust** | drive the system without voice; admin tasks |
 
@@ -52,8 +52,8 @@ stdio adapter around `query()`.
 
 | Link | Transport | Encoding |
 |---|---|---|
-| bridge ⇄ runner | child-process stdin/stdout | length-delimited protobuf frames (varint length + message) |
-| runner ⇄ hub | gRPC over HTTP/2 + TLS (`RunnerService.Attach`, bidi stream) | protobuf |
+| bridge ⇄ daemon | child-process stdin/stdout | length-delimited protobuf frames (varint length + message) |
+| daemon ⇄ hub | gRPC over HTTP/2 + TLS (`DaemonService.Attach`, bidi stream) | protobuf |
 | voice ⇄ hub | gRPC (`ClientService`, `AuthService`) | protobuf |
 | cli ⇄ hub | gRPC (same services) | protobuf |
 
@@ -86,9 +86,9 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
                ▼
          external Postgres (database `blue`, role `blue_hub`)
                ▲
-               │ gRPC RunnerService.Attach bidi stream (outbound, machine token)
+               │ gRPC DaemonService.Attach bidi stream (outbound, machine token)
   ┌────────────┴───────────── each machine ─────────────────┐
-  │ blue-runner (Rust)                                       │
+  │ blue-daemon (Rust)                                       │
   │  hub connection · session supervisor · SDK→event         │
   │  translation · SQLite outbox · project allowlist         │
   │       │ stdin/stdout length-delimited protobuf           │
@@ -106,9 +106,9 @@ enforces style; `buf breaking` guards compatibility once v1 ships.
 1. I say "in the blue repo on my desktop, add a health endpoint."
 2. Voice LLM calls `start_task(machine="desktop", project="blue", instructions=…)`.
 3. Voice sends `session.create` to the hub; hub persists session + turn, routes
-   `session.start` to the desktop runner; voice immediately says "On it."
-4. Runner spawns a bridge, sends `start` + `prompt`. Bridge calls `query()`.
-5. SDK messages stream bridge → runner (raw). Runner translates to events, writes them to its
+   `session.start` to the desktop daemon; voice immediately says "On it."
+4. Daemon spawns a bridge, sends `start` + `prompt`. Bridge calls `query()`.
+5. SDK messages stream bridge → daemon (raw). Daemon translates to events, writes them to its
    outbox, sends them to the hub; hub stores them and fans out to subscribers.
 6. Voice stays quiet during progress. If I ask "what's it doing?", it calls `get_status`, which
    returns recent progress events, and summarizes.
@@ -133,8 +133,8 @@ blue/
 ├── proto/                     # ★ single source of truth for every wire protocol
 │   └── blue/
 │       ├── events/v1/events.proto   # SessionEvent (translated from SDK messages)
-│       ├── bridge/v1/bridge.proto   # runner ⇄ bridge stdio frames
-│       ├── runner/v1/runner.proto   # RunnerService (hub ⇄ runner)
+│       ├── bridge/v1/bridge.proto   # daemon ⇄ bridge stdio frames
+│       ├── daemon/v1/daemon.proto   # DaemonService (hub ⇄ daemon)
 │       ├── client/v1/client.proto   # ClientService (hub ⇄ voice/cli)
 │       └── auth/v1/auth.proto       # AuthService (login, LiveKit tokens, pairing)
 ├── crates/
@@ -144,7 +144,7 @@ blue/
 │   │   ├── src/{main.rs, config.rs, grpc/, auth/, db/, routing/, livekit.rs}
 │   │   ├── migrations/        # sqlx migrations (embedded)
 │   │   └── Dockerfile
-│   ├── runner/                # bin: blue-runner
+│   ├── daemon/                # bin: blue-daemon
 │   │   └── src/{main.rs, config.rs, hub_conn.rs, supervisor.rs, bridge_proc.rs,
 │   │            translate.rs, outbox.rs, service.rs, doctor.rs}
 │   └── cli/                   # bin: blue
@@ -171,13 +171,13 @@ blue/
 ## 5. Protocols
 
 Every protocol is a set of `.proto` files under `proto/blue/<area>/v1/`. Package names follow
-the directory (`blue.runner.v1`, …); `buf lint` (STANDARD rules) runs in CI.
+the directory (`blue.daemon.v1`, …); `buf lint` (STANDARD rules) runs in CI.
 
 | Package | File | Used by |
 |---|---|---|
-| `blue.events.v1` | `events.proto` | `SessionEvent` + `SessionState` shared by runner, hub, clients |
-| `blue.bridge.v1` | `bridge.proto` | runner ⇄ bridge stdio |
-| `blue.runner.v1` | `runner.proto` | `RunnerService` (hub ⇄ runner) |
+| `blue.events.v1` | `events.proto` | `SessionEvent` + `SessionState` shared by daemon, hub, clients |
+| `blue.bridge.v1` | `bridge.proto` | daemon ⇄ bridge stdio |
+| `blue.daemon.v1` | `daemon.proto` | `DaemonService` (hub ⇄ daemon) |
 | `blue.client.v1` | `client.proto` | `ClientService` (hub ⇄ voice, cli, later web) |
 | `blue.auth.v1` | `auth.proto` | `AuthService` (login, LiveKit tokens, pairing, revocation) |
 
@@ -195,24 +195,24 @@ Generated code:
 additive only (`buf breaking` against `main` once phase 2 lands). Handshakes also carry a
 `protocol_version` integer so mismatched binaries fail fast with a readable error.
 
-### 5.1 Runner ⇄ Bridge (stdio, `blue.bridge.v1`)
+### 5.1 Daemon ⇄ Bridge (stdio, `blue.bridge.v1`)
 
 One bridge process per session. **stdout carries only protocol frames**; stderr is logs
-(runner forwards them into `tracing`).
+(daemon forwards them into `tracing`).
 
 Framing: each frame is a protobuf varint length followed by that many bytes of message —
 the standard "size-delimited" format (`prost::Message::encode_length_delimited` in Rust,
 `sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`).
 
-- Runner → bridge: `BridgeInput { oneof command { Start, Prompt, Interrupt, Close } }`
+- Daemon → bridge: `BridgeInput { oneof command { Start, Prompt, Interrupt, Close } }`
   - `Start { session_id, cwd, claude_path, resume_claude_session_id?, model?, include_partial_messages }`
   - `Prompt { turn_id, text }`
   - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
-- Bridge → runner: `BridgeOutput { oneof event { Ready, SdkMessage, Error, Exited } }`
+- Bridge → daemon: `BridgeOutput { oneof event { Ready, SdkMessage, Error, Exited } }`
   - `Ready { protocol_version, bridge_version, sdk_version, runtime_version }` — sent first
   - `SdkMessage { json }` — the `SDKMessage` exactly as the SDK yielded it, `JSON.stringify`'d.
     This is the one deliberate opaque field: the SDK's message shapes are Anthropic's and change
-    with SDK releases, so the bridge doesn't reinterpret them; the runner parses what it needs.
+    with SDK releases, so the bridge doesn't reinterpret them; the daemon parses what it needs.
   - `Error { message, fatal }`, `Exited { code }`
 
 Bridge behavior: `query({ prompt: asyncIterableOfUserMessages, options: { cwd, resume,
@@ -220,36 +220,36 @@ permissionMode: "bypassPermissions", pathToClaudeCodeExecutable: claudePath, mod
 includePartialMessages } })`. `Interrupt` → `q.interrupt()`. `Close` or stdin EOF ends the
 input iterable so the query finishes cleanly.
 
-Runner-side process control: the bridge (and the `claude` it spawns) run in a Windows Job
+Daemon-side process control: the bridge (and the `claude` it spawns) run in a Windows Job
 Object / Unix process group so a hard kill takes down the whole tree.
 
-### 5.2 Runner ⇄ Hub (`blue.runner.v1.RunnerService`)
+### 5.2 Daemon ⇄ Hub (`blue.daemon.v1.DaemonService`)
 
 ```proto
-service RunnerService {
+service DaemonService {
   rpc Attach(stream AttachRequest) returns (stream AttachResponse);
 }
 ```
 
-One long-lived bidirectional gRPC stream per runner, opened outbound from the machine.
+One long-lived bidirectional gRPC stream per daemon, opened outbound from the machine.
 Auth: `authorization: Bearer <machine token>` metadata. HTTP/2 keepalive pings every 20 s;
-the runner reconnects with jittered backoff when the stream ends.
+the daemon reconnects with jittered backoff when the stream ends.
 
-Runner → hub (`AttachRequest.oneof message`):
+Daemon → hub (`AttachRequest.oneof message`):
 
 | Message | Fields | Notes |
 |---|---|---|
-| `Hello` | `protocol_version, versions{runner, bridge, sdk, claude}, os, arch, projects[{name, path}], sessions[{session_id, claude_session_id, state, last_seq}]` | must be first |
-| `RunnerEvent` | `session_id, seq, turn_id, occurred_at, blue.events.v1.SessionEvent event` | `seq` per-session, monotonic, outbox-backed |
+| `Hello` | `protocol_version, versions{daemon, bridge, sdk, claude}, os, arch, projects[{name, path}], sessions[{session_id, claude_session_id, state, last_seq}]` | must be first |
+| `DaemonEvent` | `session_id, seq, turn_id, occurred_at, blue.events.v1.SessionEvent event` | `seq` per-session, monotonic, outbox-backed |
 | `CommandResult` | `command_id, ok, error_code, error_message` | reply to a hub `Command` |
 
-Hub → runner (`AttachResponse.oneof message`):
+Hub → daemon (`AttachResponse.oneof message`):
 
 | Message | Fields |
 |---|---|
-| `Welcome` | `machine_id, map<session_id, acked_seq>` — runner trims/replays its outbox |
+| `Welcome` | `machine_id, map<session_id, acked_seq>` — daemon trims/replays its outbox |
 | `Command` | `command_id` + `oneof { StartSession, SendPrompt, InterruptSession, CloseSession }` |
-| `EventsAck` | `session_id, up_to_seq` — runner deletes outbox rows ≤ seq |
+| `EventsAck` | `session_id, up_to_seq` — daemon deletes outbox rows ≤ seq |
 
 - `StartSession { session_id, project_name, resume_claude_session_id?, model? }`
 - `SendPrompt { session_id, turn_id, text }`
@@ -257,11 +257,11 @@ Hub → runner (`AttachResponse.oneof message`):
 
 Delivery guarantees:
 
-- Runner → hub events are **at-least-once**; hub dedupes on `(session_id, seq)`.
-- Hub → runner commands are idempotent by `command_id`; runner keeps recently processed ids
+- Daemon → hub events are **at-least-once**; hub dedupes on `(session_id, seq)`.
+- Hub → daemon commands are idempotent by `command_id`; daemon keeps recently processed ids
   (persisted in its SQLite).
 - On reconnect, `Hello.sessions` + `Welcome.acked_seqs` reconcile state: hub marks sessions it
-  believed running but the runner doesn't know as failed ("runner lost session"); runner replays
+  believed running but the daemon doesn't know as failed ("daemon lost session"); daemon replays
   unacked outbox entries.
 
 ### 5.3 Client ⇄ Hub (`blue.client.v1.ClientService`)
@@ -293,28 +293,28 @@ use gRPC status codes: `NOT_FOUND`, and `FAILED_PRECONDITION` for ambiguity, wit
 | `Login` | — | username/password → short-lived user JWT |
 | `CreateLiveKitToken` | user JWT | mint a room token with agent dispatch for `blue-voice` |
 | `CreatePairingCode` | user JWT | one-time code, 10 min TTL |
-| `ClaimPairingCode` | the code | runner exchanges code + machine name → `machine_id`, machine token |
+| `ClaimPairingCode` | the code | daemon exchanges code + machine name → `machine_id`, machine token |
 | `RevokeMachine` | user JWT | revoke a machine token and drop its stream |
 
 ### 5.5 Event model (`blue.events.v1.SessionEvent`)
 
-The runner translates raw `SDKMessage` JSON into `SessionEvent` (`crates/runner/src/translate.rs`,
+The daemon translates raw `SDKMessage` JSON into `SessionEvent` (`crates/daemon/src/translate.rs`,
 tested against recorded fixtures). `SessionEvent` is a `oneof`:
 
 | Variant | From | Fields |
 |---|---|---|
 | `SessionStarted` | SDK `system` / `init` | `claude_session_id, model, cwd` |
-| `TurnStarted` | runner, on prompt sent | `turn_id` |
+| `TurnStarted` | daemon, on prompt sent | `turn_id` |
 | `AssistantText` | SDK `assistant` text blocks | `text` (complete block, not partials) |
 | `ToolStarted` | SDK `assistant` tool_use blocks | `tool_use_id, tool, summary` e.g. `Edit src/main.rs`, `Bash: cargo test` |
 | `ToolFinished` | SDK `user` tool_result blocks | `tool_use_id, is_error` |
 | `TurnCompleted` | SDK `result` (success) | `turn_id, result_text, duration_ms, num_turns, cost_usd` |
 | `TurnFailed` | SDK `result` (error) / bridge crash | `turn_id, reason` |
 | `TurnInterrupted` | after interrupt | `turn_id` |
-| `SessionStateChanged` | runner | `SessionState` enum: `STARTING, IDLE, RUNNING, CLOSED, FAILED` |
+| `SessionStateChanged` | daemon | `SessionState` enum: `STARTING, IDLE, RUNNING, CLOSED, FAILED` |
 | `RawSdkMessage` | every SDK message (if `forward_raw`) | `json` |
 
-`MachineStatus { machine_id, online }` is produced by the hub, not the runner, and lives in
+`MachineStatus { machine_id, online }` is produced by the hub, not the daemon, and lives in
 `blue.client.v1.Event`. Partial stream events (`stream_event`) are only forwarded as
 `RawSdkMessage`. Unknown SDK message types are logged and forwarded raw, never fatal.
 
@@ -338,21 +338,21 @@ migrations), `livekit-api` (token minting), `jsonwebtoken`, `argon2`, `tracing`,
 
 - `grpc.health.v1.Health` — liveness/readiness (readiness = DB reachable + migrations current);
   Kubernetes uses native gRPC probes.
-- `blue.auth.v1.AuthService`, `blue.client.v1.ClientService`, `blue.runner.v1.RunnerService`
+- `blue.auth.v1.AuthService`, `blue.client.v1.ClientService`, `blue.daemon.v1.DaemonService`
   (§5). An interceptor maps the bearer token to a principal (user / voice / machine) and each
   RPC checks the principal kind it requires.
 
 **Internals:**
 
-- `routing::Registry` — in-memory map `machineId → runner stream handle` (mpsc sender);
+- `routing::Registry` — in-memory map `machineId → daemon stream handle` (mpsc sender);
   online/offline derived from it and broadcast as `machine.status`.
 - `routing::Fanout` — `tokio::sync::broadcast` of persisted events to client subscribers;
   slow subscribers get dropped and resume from their cursor.
-- Write path: `RunnerEvent` → insert (`ON CONFLICT DO NOTHING` on `(session_id, seq)`) →
-  update session/turn rows → broadcast → `events.ack` to runner.
+- Write path: `DaemonEvent` → insert (`ON CONFLICT DO NOTHING` on `(session_id, seq)`) →
+  update session/turn rows → broadcast → `events.ack` to daemon.
 - Turn queue: if a `session.prompt` arrives while a turn is running, it is persisted as
   `queued` and dispatched on the next `turn.completed`/`failed`/`interrupted`.
-- Graceful shutdown on SIGTERM: health → NOT_SERVING, end runner/client streams, flush, exit.
+- Graceful shutdown on SIGTERM: health → NOT_SERVING, end daemon/client streams, flush, exit.
 
 **Config (env):** `BLUE_DATABASE_URL`, `BLUE_PUBLIC_URL`, `BLUE_JWT_SECRET`,
 `BLUE_VOICE_TOKEN` (compared in constant time; stored hashed at startup),
@@ -363,7 +363,7 @@ migrations), `livekit-api` (token minting), `jsonwebtoken`, `argon2`, `tracing`,
 
 ```
 users          (id, username UNIQUE, password_hash, created_at)
-machines       (id, name UNIQUE, token_hash, os, arch, runner_version, bridge_version,
+machines       (id, name UNIQUE, token_hash, os, arch, daemon_version, bridge_version,
                 sdk_version, claude_version, created_at, last_seen_at, revoked_at)
 pairing_codes  (code_hash PK, created_by, expires_at, claimed_at, machine_id)
 projects       (id, machine_id FK, name, path, last_reported_at, UNIQUE(machine_id, name))
@@ -380,27 +380,27 @@ audit_log      (id, at, actor, action, detail JSONB)
 Raw events are retained for a configurable window (default 14 days) by a periodic cleanup
 task; translated events are kept.
 
-### 6.3 Runner (`crates/runner`, bin `blue-runner`)
+### 6.3 Daemon (`crates/daemon`, bin `blue-daemon`)
 
 **Subcommands:**
 
-- `blue-runner pair --hub https://hub.example.com --code ABCD-1234 [--name desktop]`
-- `blue-runner start` — foreground.
-- `blue-runner service install|uninstall|status` — via the `service-manager` crate
+- `blue-daemon pair --hub https://hub.example.com --code ABCD-1234 [--name desktop]`
+- `blue-daemon start` — foreground.
+- `blue-daemon service install|uninstall|status` — via the `service-manager` crate
   (Windows service / launchd / systemd user unit).
-- `blue-runner doctor` — checks: config valid, `claude` found + version, bridge starts and
+- `blue-daemon doctor` — checks: config valid, `claude` found + version, bridge starts and
   reports a matching protocol version, hub reachable and token accepted, each project path
   exists.
-- `blue-runner projects add <name> <path>` / `list` / `remove`.
+- `blue-daemon projects add <name> <path>` / `list` / `remove`.
 
-**Config:** `runner.toml` in the OS config dir (`%APPDATA%\blue\` on Windows,
+**Config:** `daemon.toml` in the OS config dir (`%APPDATA%\blue\` on Windows,
 `~/.config/blue/` elsewhere):
 
 ```toml
 hub_url = "https://hub.example.com"
 machine_name = "desktop"
 claude_path = "C:/Users/Jason/.local/bin/claude.exe"   # auto-detected if omitted
-bridge_path = ""                                        # default: next to blue-runner
+bridge_path = ""                                        # default: next to blue-daemon
 max_concurrent_sessions = 4
 forward_raw = true
 
@@ -422,7 +422,7 @@ restricted permissions.
 - `translate` — raw `SDKMessage` → events (§5.5); pure function, fixture-tested.
 - `outbox` — SQLite (`sqlx` sqlite): `(session_id, seq, payload)`; append before send,
   delete on `events.ack`. Also stores `sessions(session_id, claude_session_id, project)` so a
-  restarted runner can resume.
+  restarted daemon can resume.
 - Project allowlist: `session.start` for a project not in config → rejected. Permissions are
   otherwise wide open (`bypassPermissions`), so this is the one local guardrail.
 - Recovery: bridge exits unexpectedly mid-turn → emit `turn.failed`; next prompt to that
@@ -437,12 +437,12 @@ restricted permissions.
 - ~200 lines: decode size-delimited `BridgeInput` frames from stdin, one `query()` per
   process, async-iterable input queue for prompts, forward every yielded message as
   `SdkMessage { json }`, handle `Interrupt`/`Close`, emit `Exited`.
-- Always passes `pathToClaudeCodeExecutable` (the runner supplies the installed `claude`), so
+- Always passes `pathToClaudeCodeExecutable` (the daemon supplies the installed `claude`), so
   the bundled-CLI resolution inside the SDK is never relied on.
 - Built with `bun build --compile` for `bun-windows-x64`, `bun-darwin-arm64`,
-  `bun-darwin-x64`, `bun-linux-x64`, `bun-linux-arm64`; shipped next to `blue-runner`.
+  `bun-darwin-x64`, `bun-linux-x64`, `bun-linux-arm64`; shipped next to `blue-daemon`.
 - `--replay <fixture>` mode: emits a recorded stream instead of calling the SDK, for
-  runner tests and CI without Claude credentials.
+  daemon tests and CI without Claude credentials.
 
 ### 6.5 Voice agent (`voice/`, Python)
 
@@ -526,15 +526,15 @@ Permissions are wide open on the machines, so **hub auth is the security boundar
 |---|---|---|
 | Me (user) | username + password → short-lived JWT | argon2 hash in DB / Secret |
 | Voice agent | static service token | k8s Secret (hub) + LiveKit Cloud secret (agent) |
-| Each runner | per-machine token from pairing | hash in DB; plaintext in OS keyring on machine |
+| Each daemon | per-machine token from pairing | hash in DB; plaintext in OS keyring on machine |
 | LiveKit room | room token minted by hub after login | — |
 
 - Pairing codes: single-use, 10-minute TTL, hashed at rest.
 - Machine tokens revocable; revocation closes the live connection.
 - Rate limiting on `AuthService.Login` and `AuthService.ClaimPairingCode`.
-- TLS everywhere via cert-manager on ingress; runners refuse plaintext hubs except
+- TLS everywhere via cert-manager on ingress; daemons refuse plaintext hubs except
   `localhost`.
-- Runner-side project allowlist: Claude only ever starts in configured project directories.
+- Daemon-side project allowlist: Claude only ever starts in configured project directories.
 - Audit log of logins, pairings, revocations, session creates.
 
 ---
@@ -559,7 +559,7 @@ Target: self-run cluster (k3s assumed). Generic enough for others.
   `blue-hub db bootstrap`, the only pod that mounts the admin DSN Secret.
 - `job-db-migrate.yaml` — `pre-install,pre-upgrade` hook, weight 0, `blue-hub db migrate`.
 - `serviceaccount.yaml`, `NOTES.txt` (prints the hub URL, how to get the voice token, how to
-  pair a runner), `tests/test-connection.yaml` (`helm test` runs a gRPC health check).
+  pair a daemon), `tests/test-connection.yaml` (`helm test` runs a gRPC health check).
 - `values.schema.json` — validates values.
 
 **Values sketch:**
@@ -623,7 +623,7 @@ k3d (for chart testing), Helm.
 | `just db` | `docker compose up` Postgres 17 with an admin user |
 | `just hub` | `blue-hub db bootstrap && db migrate && serve` against local Postgres |
 | `just bridge` | `bun build --compile` the bridge into `target/debug/` |
-| `just runner` | `blue-runner start` against `http://localhost:8080` |
+| `just daemon` | `blue-daemon start` against `http://localhost:8080` |
 | `just voice` | `uv run python -m blue_voice dev` — local worker connects to LiveKit Cloud, talks to the local hub directly (no tunnel needed) |
 | `just proto` | `buf lint` + regenerate TS and Python protocol code (Rust regenerates on build) |
 | `just test` | cargo tests, bridge typecheck + tests, voice tests |
@@ -639,11 +639,11 @@ Frontend during development: LiveKit Agents Playground, connecting with a token 
 - **Translation:** recorded raw SDK streams in `bridge/fixtures/*.ndjson` (captured in phase
   1 from the real `claude`), run through `translate.rs`, snapshot-tested with `insta`.
 - **Protocol:** `buf lint`; framing round-trip tests in Rust and TS; Python import/round-trip
-  test; generated-code freshness check in CI; cross-language handshake (runner ⇄ compiled bridge).
-- **Runner:** integration tests using `claude-bridge --replay` — multi-turn, interrupt, bridge
+  test; generated-code freshness check in CI; cross-language handshake (daemon ⇄ compiled bridge).
+- **Daemon:** integration tests using `claude-bridge --replay` — multi-turn, interrupt, bridge
   crash + resume, outbox replay after a dropped hub connection.
 - **Hub:** integration tests against real Postgres (`testcontainers`), with an in-process fake
-  runner and fake client over real gRPC streams: routing, dedupe, turn queueing, reconnect
+  daemon and fake client over real gRPC streams: routing, dedupe, turn queueing, reconnect
   reconciliation, auth failures.
 - **Bootstrap/migrations:** test against a fresh Postgres with a non-superuser admin that has
   only `CREATEROLE CREATEDB`.
@@ -653,7 +653,7 @@ Frontend during development: LiveKit Agents Playground, connecting with a token 
 - **End-to-end smoke (manual / opt-in CI with credentials):** real `claude` on a scratch repo,
   driven by `blue run`.
 
-Scaling note for later: multiple hub replicas need cross-pod routing (runner connected to pod
+Scaling note for later: multiple hub replicas need cross-pod routing (daemon connected to pod
 A, client on pod B). Postgres `LISTEN/NOTIFY` is the planned mechanism, so no Redis. Not in
 scope now.
 
@@ -668,7 +668,7 @@ scope now.
 - **release.yml** (tag `v*`):
   - hub image → `ghcr.io/<owner>/blue-hub:<version>` (amd64 + arm64)
   - chart → `oci://ghcr.io/<owner>/charts/blue-hub:<version>`
-  - runner archives per target (`blue-runner` + `claude-bridge` + `blue` + README) → GitHub
+  - daemon archives per target (`blue-daemon` + `claude-bridge` + `blue` + README) → GitHub
     Release
 - Voice deploys are manual (`lk agent deploy`) at first; automate later if useful.
 
@@ -681,21 +681,21 @@ One version number for the whole repo.
 **Phase 0 — Scaffold**
 Cargo workspace, `proto/` with the v1 definitions, codegen for Rust/TS/Python, `bridge/`
 (bun) answering the protobuf handshake, `voice/` (uv) skeleton, `justfile`, CI, GitHub repo.
-*Exit:* `just test` and CI pass; `blue-runner doctor` spawns the bun-compiled bridge and gets a
+*Exit:* `just test` and CI pass; `blue-daemon doctor` spawns the bun-compiled bridge and gets a
 `Ready` frame over protobuf; `blue health` gets SERVING from `blue-hub serve`.
 
-**Phase 1 — Runner ⇄ bridge on Windows (riskiest first)**
+**Phase 1 — Daemon ⇄ bridge on Windows (riskiest first)**
 Bridge implemented; Rust spawns it, runs a multi-turn session in a scratch repo, interrupts,
 kills mid-turn, resumes with `claudeSessionId`. Verify `bun build --compile` works with the
 SDK and an explicit `pathToClaudeCodeExecutable`. Record fixtures. Implement `translate.rs`.
 *Exit:* a Rust test binary drives three turns + interrupt + resume against real `claude`;
 translation snapshot tests pass on fixtures; process-tree kill verified on Windows.
 
-**Phase 2 — Hub, protocol, runner, CLI (local)**
+**Phase 2 — Hub, protocol, daemon, CLI (local)**
 Protocols in `crates/protocol`; hub with Postgres, bootstrap, migrations, auth, pairing,
-routing, event log, fan-out, turn queue; runner hub connection + outbox + reconciliation; CLI.
-*Exit:* `blue run desktop blue "…"` streams a full task through hub → runner → Claude and back;
-killing the hub or the runner mid-task loses no events.
+routing, event log, fan-out, turn queue; daemon hub connection + outbox + reconciliation; CLI.
+*Exit:* `blue run desktop blue "…"` streams a full task through hub → daemon → Claude and back;
+killing the hub or the daemon mid-task loses no events.
 
 **Phase 3 — Voice agent (local worker)**
 Agent with tools, hub client, notifier, system prompt; LiveKit Cloud project; Agents
@@ -710,10 +710,10 @@ Hub Dockerfile, chart with hooks, k3d test, release workflow publishing image + 
 **Phase 5 — Real deployment**
 Install chart in the self-run cluster against the hosted Postgres; DNS + TLS; `lk agent deploy`
 the voice agent with secrets; pair this machine against the public hub.
-*Exit:* full voice loop from my phone with nothing running locally except `blue-runner`.
+*Exit:* full voice loop from my phone with nothing running locally except `blue-daemon`.
 
 **Phase 6 — Hardening**
-Runner as OS service with bundled bridge; second machine; offline handling and spoken
+Daemon as OS service with bundled bridge; second machine; offline handling and spoken
 "machine went offline"; idle bridge reaping; raw-event retention; audit log; release archives
 for all targets.
 *Exit:* reboot a machine mid-session → it comes back, reconnects, and the session resumes on
@@ -736,7 +736,7 @@ Technology decided then.
 | Allow-all permissions + remote voice | Strong hub auth; per-machine tokens; project allowlist; audit log |
 | Voice talks over me / interrupts at bad times | Notifications only when both sides are quiet; coalescing; LiveKit turn detection |
 | Hosted Postgres disallows `CREATE DATABASE` | Manual `bootstrap.sql` path with bootstrap disabled |
-| `claude` not logged in on a machine | `blue-runner doctor` checks; surfaced as `turn.failed` with a clear reason |
+| `claude` not logged in on a machine | `blue-daemon doctor` checks; surfaced as `turn.failed` with a clear reason |
 
 ---
 

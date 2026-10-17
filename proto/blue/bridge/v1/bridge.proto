@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package blue.bridge.v1;
 
-// Runner <-> claude-bridge protocol over the bridge's stdin/stdout.
+// Daemon <-> claude-bridge protocol over the bridge's stdin/stdout.
 //
 // Framing: every frame is a varint length prefix followed by one encoded message
 // ("size-delimited"). stdout carries only frames; the bridge logs to stderr.
 // One bridge process hosts exactly one session.
 
-// Runner -> bridge.
+// Daemon -> bridge.
 message BridgeInput {
   oneof command {
     Start start = 1;
@@ -18,7 +18,7 @@ message BridgeInput {
   }
 }
 
-// Bridge -> runner.
+// Bridge -> daemon.
 message BridgeOutput {
   oneof event {
     Ready ready = 1;
@@ -31,7 +31,7 @@ message BridgeOutput {
 // Starts the Agent SDK query. Must be the first command, sent once.
 message Start {
   string session_id = 1;
-  // Working directory for Claude (a project path from the runner's allowlist).
+  // Working directory for Claude (a project path from the daemon's allowlist).
   string cwd = 2;
   // Path to the installed `claude` executable, passed as pathToClaudeCodeExecutable.
   string claude_path = 3;

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package blue.events.v1;
 
-// Lifecycle state of a session as seen by the runner that owns it.
+// Lifecycle state of a session as seen by the daemon that owns it.
 enum SessionState {
   SESSION_STATE_UNSPECIFIED = 0;
   SESSION_STATE_STARTING = 1;
@@ -12,8 +12,8 @@ enum SessionState {
   SESSION_STATE_FAILED = 5;
 }
 
-// A session event, produced by the runner by translating raw Agent SDK messages.
-// Shared by the runner, the hub, and every client.
+// A session event, produced by the daemon by translating raw Agent SDK messages.
+// Shared by the daemon, the hub, and every client.
 message SessionEvent {
   oneof kind {
     SessionStarted session_started = 1;

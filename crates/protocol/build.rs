@@ -3,7 +3,7 @@ use std::path::PathBuf;
 const PROTOS: &[&str] = &[
     "blue/events/v1/events.proto",
     "blue/bridge/v1/bridge.proto",
-    "blue/runner/v1/runner.proto",
+    "blue/daemon/v1/daemon.proto",
     "blue/client/v1/client.proto",
     "blue/auth/v1/auth.proto",
 ];

@@ -1,4 +1,4 @@
-//! Size-delimited protobuf framing for the runner <-> bridge stdio link: each frame is a varint
+//! Size-delimited protobuf framing for the daemon <-> bridge stdio link: each frame is a varint
 //! length followed by one encoded message. This is the same format as
 //! `sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`.
 

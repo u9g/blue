@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
-    name = "blue-runner",
+    name = "blue-daemon",
     version,
     about = "Connects this machine to the Blue hub"
 )]
@@ -19,7 +19,7 @@ struct Cli {
 enum Command {
     /// Check that the bridge and `claude` are usable from this machine.
     Doctor {
-        /// Path to the claude-bridge executable. Defaults to the one next to blue-runner.
+        /// Path to the claude-bridge executable. Defaults to the one next to blue-daemon.
         #[arg(long, env = "BLUE_BRIDGE_PATH")]
         bridge: Option<PathBuf>,
         /// Path to the `claude` executable.
