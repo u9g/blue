@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file blue/bridge/v1/bridge.proto.
  */
 export const file_blue_bridge_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsUBCg5EYWVtb25Ub0JyaWRnZRImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixgEKDkJyaWRnZVRvRGFlbW9uEiYKBXJlYWR5GAEgASgLMhUuYmx1ZS5icmlkZ2UudjEuUmVhZHlIABIxCgtzZGtfbWVzc2FnZRgCIAEoCzIaLmJsdWUuYnJpZGdlLnYxLlNka01lc3NhZ2VIABImCgVlcnJvchgDIAEoCzIVLmJsdWUuYnJpZGdlLnYxLkVycm9ySAASKAoGZXhpdGVkGAQgASgLMhYuYmx1ZS5icmlkZ2UudjEuRXhpdGVkSABCBwoFZXZlbnQikgEKBVN0YXJ0EhIKCnNlc3Npb25faWQYASABKAkSEwoLY2xhdWRlX3BhdGgYAiABKAkSJQoYcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkGAMgASgJSACIAQESEgoFbW9kZWwYBCABKAlIAYgBAUIbChlfcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkQggKBl9tb2RlbCIWCgZQcm9tcHQSDAoEdGV4dBgBIAEoCSILCglJbnRlcnJ1cHQiBwoFQ2xvc2UiZwoFUmVhZHkSGAoQcHJvdG9jb2xfdmVyc2lvbhgBIAEoDRIWCg5icmlkZ2VfdmVyc2lvbhgCIAEoCRITCgtzZGtfdmVyc2lvbhgDIAEoCRIXCg9ydW50aW1lX3ZlcnNpb24YBCABKAkiGgoKU2RrTWVzc2FnZRIMCgRqc29uGAEgASgJIhgKBUVycm9yEg8KB21lc3NhZ2UYASABKAkiFwoGRXhpdGVkEg0KBWVycm9yGAEgASgJYgZwcm90bzM");
+  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsUBCg5EYWVtb25Ub0JyaWRnZRImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixgEKDkJyaWRnZVRvRGFlbW9uEiYKBXJlYWR5GAEgASgLMhUuYmx1ZS5icmlkZ2UudjEuUmVhZHlIABIxCgtzZGtfbWVzc2FnZRgCIAEoCzIaLmJsdWUuYnJpZGdlLnYxLlNka01lc3NhZ2VIABImCgVlcnJvchgDIAEoCzIVLmJsdWUuYnJpZGdlLnYxLkVycm9ySAASKAoGZXhpdGVkGAQgASgLMhYuYmx1ZS5icmlkZ2UudjEuRXhpdGVkSABCBwoFZXZlbnQinwEKBVN0YXJ0EhIKCnNlc3Npb25faWQYASABKAkSEwoLY2xhdWRlX3BhdGgYAiABKAkSJQoYcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkGAMgASgJSACIAQESEgoFbW9kZWwYBCABKAlIAYgBARILCgNjd2QYBSABKAlCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiCwoJSW50ZXJydXB0IgcKBUNsb3NlImcKBVJlYWR5EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SFgoOYnJpZGdlX3ZlcnNpb24YAiABKAkSEwoLc2RrX3ZlcnNpb24YAyABKAkSFwoPcnVudGltZV92ZXJzaW9uGAQgASgJIhoKClNka01lc3NhZ2USDAoEanNvbhgBIAEoCSIYCgVFcnJvchIPCgdtZXNzYWdlGAEgASgJIhcKBkV4aXRlZBINCgVlcnJvchgBIAEoCWIGcHJvdG8z");
 
 /**
  * @generated from message blue.bridge.v1.DaemonToBridge
@@ -95,8 +95,14 @@ export const BridgeToDaemonSchema: GenMessage<BridgeToDaemon> = /*@__PURE__*/
   messageDesc(file_blue_bridge_v1_bridge, 1);
 
 /**
- * Starts the Agent SDK query. Must be the first command, sent once.
- * Claude always starts in the user's home directory and may work anywhere on the machine.
+ * Starts a session. Must be the first command, sent once.
+ *
+ * New session (no resume id): the bridge waits for the first Prompt, then runs a short scouting
+ * query in `cwd` that picks the project directory the request is about, and starts the real
+ * session there. Claude may still work anywhere on the machine.
+ *
+ * Resumed session: the bridge starts the real session directly in `cwd`, which must be the
+ * directory the session originally ran in (Claude Code stores sessions per directory).
  *
  * @generated from message blue.bridge.v1.Start
  */
@@ -126,6 +132,14 @@ export type Start = Message<"blue.bridge.v1.Start"> & {
    * @generated from field: optional string model = 4;
    */
   model?: string | undefined;
+
+  /**
+   * Absolute directory: where scouting starts for a new session, or the session's own
+   * directory when resuming. Required.
+   *
+   * @generated from field: string cwd = 5;
+   */
+  cwd: string;
 };
 
 /**

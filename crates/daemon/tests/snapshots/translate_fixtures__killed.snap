@@ -1,0 +1,6 @@
+---
+source: crates/daemon/tests/translate_fixtures.rs
+expression: "translate_fixture(\"killed\")"
+---
+SessionStarted model=claude-haiku-5-5 cwd=<HOME>\AppData\Local\Temp\.tmp5KFbZ2\todo
+ToolStarted Bash "Bash: Run echo, sleep 120s, and echo in foreground"

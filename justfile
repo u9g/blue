@@ -66,6 +66,22 @@ lint-voice:
 handshake: bridge
     cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge{{exe}}
 
+# Chat with Claude in this terminal via daemon + bridge, no server (e.g. `just session --model haiku`)
+session *args: bridge
+    cargo run -q -p blue-daemon -- session --bridge target/bridge/claude-bridge{{exe}} {{args}}
+
+# Daemon driving the compiled bridge in replay mode (no Claude needed)
+test-replay: bridge
+    cargo test -q -p blue-daemon --test replay -- --ignored
+
+# Real Claude sessions: needs Claude Code installed and logged in; uses Haiku, costs a little
+test-live: bridge
+    cargo test -q -p blue-daemon --test live -- --ignored --test-threads=1
+
+# test-live, then copy its recordings into the fixtures (review snapshots with `cargo insta review`)
+record-fixtures: test-live
+    cp target/fixtures/*.jsonl crates/daemon/tests/fixtures/
+
 # Run the server locally
 server:
     cargo run -p blue-server -- serve --listen 127.0.0.1:50051

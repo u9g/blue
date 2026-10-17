@@ -1,0 +1,7 @@
+---
+source: crates/daemon/tests/translate_fixtures.rs
+expression: "translate_fixture(\"resume\")"
+---
+SessionStarted model=claude-haiku-5-5 cwd=<HOME>\AppData\Local\Temp\.tmpLfGQ3V\calc
+AssistantText "subtract"
+TurnCompleted t1 num_turns=1 result="subtract"

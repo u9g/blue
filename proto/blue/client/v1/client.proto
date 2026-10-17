@@ -108,7 +108,7 @@ message ListSessionsResponse {
 message CreateSessionRequest {
   // Machine id or name (case-insensitive).
   string machine = 1;
-  // Which repo or directory to work in belongs here; Claude starts in the home directory.
+  // Say which repo or directory to work in here; the daemon finds it before Claude starts.
   string instructions = 2;
   // Short name for the session, e.g. "Health endpoint". Required; an empty title is
   // rejected with INVALID_ARGUMENT.

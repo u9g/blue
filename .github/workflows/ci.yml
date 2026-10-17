@@ -59,7 +59,7 @@ jobs:
       - run: uv run pytest -q
 
   handshake:
-    name: Daemon ⇄ compiled bridge handshake (${{ matrix.os }})
+    name: Daemon ⇄ compiled bridge (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -77,3 +77,5 @@ jobs:
       # `--version` needs no login.
       - run: npm install -g @anthropic-ai/claude-code
       - run: cargo run -q -p blue-daemon -- doctor --bridge target/bridge/claude-bridge${{ runner.os == 'Windows' && '.exe' || '' }}
+      # The daemon driving the compiled bridge through a recorded session (no Claude login).
+      - run: cargo test -q -p blue-daemon --test replay -- --ignored
