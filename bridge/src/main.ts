@@ -34,7 +34,7 @@ async function main(): Promise<number> {
   for await (const input of sizeDelimitedDecodeStream(BridgeInputSchema, Bun.stdin.stream())) {
     switch (input.command.case) {
       case "close":
-        await send({ case: "exited", value: { code: 0 } });
+        await send({ case: "exited", value: {} });
         return 0;
       case undefined:
         continue;
@@ -43,16 +43,13 @@ async function main(): Promise<number> {
         console.error(`claude-bridge: ${input.command.case} is not implemented yet`);
         await send({
           case: "error",
-          value: {
-            message: `${input.command.case} is not implemented yet`,
-            fatal: false,
-          },
+          value: { message: `${input.command.case} is not implemented yet` },
         });
     }
   }
 
   // stdin closed without Close: treat as a clean shutdown request.
-  await send({ case: "exited", value: { code: 0 } });
+  await send({ case: "exited", value: {} });
   return 0;
 }
 

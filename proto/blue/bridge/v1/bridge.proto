@@ -69,12 +69,15 @@ message SdkMessage {
   string json = 1;
 }
 
+// Something went wrong but the bridge keeps running, e.g. a command it can't handle.
+// Errors that stop the bridge are reported on Exited instead.
 message Error {
   string message = 1;
-  // A fatal error is followed by Exited.
-  bool fatal = 2;
 }
 
+// The bridge's last frame before it exits. The daemon reads the process exit status from the
+// OS, and must also handle the bridge dying without sending this (crash or kill).
 message Exited {
-  int32 code = 1;
+  // Why the bridge stopped; empty on a clean shutdown (Close or stdin EOF).
+  string error = 1;
 }

@@ -87,8 +87,8 @@ async fn bridge_handshake(bridge: &Path) -> anyhow::Result<Ready> {
     };
     write_frame(&mut stdin, &close).await?;
     match next_event(&mut stdout).await? {
-        bridge_output::Event::Exited(exited) if exited.code == 0 => {}
-        other => bail!("expected Exited with code 0 after Close, got {other:?}"),
+        bridge_output::Event::Exited(exited) if exited.error.is_empty() => {}
+        other => bail!("expected a clean Exited after Close, got {other:?}"),
     }
 
     let status = child.wait().await?;

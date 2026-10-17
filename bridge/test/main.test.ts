@@ -35,18 +35,18 @@ test("handshake: Ready first, then Exited after Close", async () => {
   }
 
   sendInput({ command: { case: "close", value: {} } });
-  expect(await next()).toMatchObject({ case: "exited", value: { code: 0 } });
+  expect(await next()).toMatchObject({ case: "exited", value: { error: "" } });
   expect(await proc.exited).toBe(0);
 });
 
-test("unimplemented commands get a non-fatal Error", async () => {
+test("unimplemented commands get an Error and the bridge keeps running", async () => {
   const { proc, next, sendInput } = spawnBridge();
   expect((await next()).case).toBe("ready");
 
   sendInput({ command: { case: "interrupt", value: {} } });
-  expect(await next()).toMatchObject({ case: "error", value: { fatal: false } });
+  expect((await next()).case).toBe("error");
 
   proc.stdin.end();
-  expect(await next()).toMatchObject({ case: "exited", value: { code: 0 } });
+  expect(await next()).toMatchObject({ case: "exited", value: { error: "" } });
   expect(await proc.exited).toBe(0);
 });

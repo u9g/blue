@@ -215,7 +215,10 @@ the standard "size-delimited" format (`prost::Message::encode_length_delimited` 
   - `SdkMessage { json }` — the `SDKMessage` exactly as the SDK yielded it, `JSON.stringify`'d.
     This is the one deliberate opaque field: the SDK's message shapes are Anthropic's and change
     with SDK releases, so the bridge doesn't reinterpret them; the daemon parses what it needs.
-  - `Error { message, fatal }`, `Exited { code }`
+  - `Error { message }` — always non-fatal; the bridge keeps running
+  - `Exited { error }` — last frame before exiting; `error` says why, empty on a clean shutdown.
+    The daemon gets the exit status from the OS, and treats the bridge dying without `Exited`
+    (crash or kill) as a failure, using the exit status and recent stderr as the reason
 
 Bridge behavior: `query({ prompt: asyncIterableOfUserMessages, options: { cwd: os.homedir(), resume,
 permissionMode: "bypassPermissions", pathToClaudeCodeExecutable: claudePath, model } })`.

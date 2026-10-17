@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file blue/bridge/v1/bridge.proto.
  */
 export const file_blue_bridge_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IpIBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEhMKC2NsYXVkZV9wYXRoGAIgASgJEiUKGHJlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZBgDIAEoCUgAiAEBEhIKBW1vZGVsGAQgASgJSAGIAQFCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiCwoJSW50ZXJydXB0IgcKBUNsb3NlImcKBVJlYWR5EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SFgoOYnJpZGdlX3ZlcnNpb24YAiABKAkSEwoLc2RrX3ZlcnNpb24YAyABKAkSFwoPcnVudGltZV92ZXJzaW9uGAQgASgJIhoKClNka01lc3NhZ2USDAoEanNvbhgBIAEoCSInCgVFcnJvchIPCgdtZXNzYWdlGAEgASgJEg0KBWZhdGFsGAIgASgIIhYKBkV4aXRlZBIMCgRjb2RlGAEgASgFYgZwcm90bzM");
+  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IpIBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEhMKC2NsYXVkZV9wYXRoGAIgASgJEiUKGHJlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZBgDIAEoCUgAiAEBEhIKBW1vZGVsGAQgASgJSAGIAQFCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiCwoJSW50ZXJydXB0IgcKBUNsb3NlImcKBVJlYWR5EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SFgoOYnJpZGdlX3ZlcnNpb24YAiABKAkSEwoLc2RrX3ZlcnNpb24YAyABKAkSFwoPcnVudGltZV92ZXJzaW9uGAQgASgJIhoKClNka01lc3NhZ2USDAoEanNvbhgBIAEoCSIYCgVFcnJvchIPCgdtZXNzYWdlGAEgASgJIhcKBkV4aXRlZBINCgVlcnJvchgBIAEoCWIGcHJvdG8z");
 
 /**
  * Daemon -> bridge.
@@ -248,6 +248,9 @@ export const SdkMessageSchema: GenMessage<SdkMessage> = /*@__PURE__*/
   messageDesc(file_blue_bridge_v1_bridge, 7);
 
 /**
+ * Something went wrong but the bridge keeps running, e.g. a command it can't handle.
+ * Errors that stop the bridge are reported on Exited instead.
+ *
  * @generated from message blue.bridge.v1.Error
  */
 export type Error = Message<"blue.bridge.v1.Error"> & {
@@ -255,13 +258,6 @@ export type Error = Message<"blue.bridge.v1.Error"> & {
    * @generated from field: string message = 1;
    */
   message: string;
-
-  /**
-   * A fatal error is followed by Exited.
-   *
-   * @generated from field: bool fatal = 2;
-   */
-  fatal: boolean;
 };
 
 /**
@@ -272,13 +268,18 @@ export const ErrorSchema: GenMessage<Error> = /*@__PURE__*/
   messageDesc(file_blue_bridge_v1_bridge, 8);
 
 /**
+ * The bridge's last frame before it exits. The daemon reads the process exit status from the
+ * OS, and must also handle the bridge dying without sending this (crash or kill).
+ *
  * @generated from message blue.bridge.v1.Exited
  */
 export type Exited = Message<"blue.bridge.v1.Exited"> & {
   /**
-   * @generated from field: int32 code = 1;
+   * Why the bridge stopped; empty on a clean shutdown (Close or stdin EOF).
+   *
+   * @generated from field: string error = 1;
    */
-  code: number;
+  error: string;
 };
 
 /**
