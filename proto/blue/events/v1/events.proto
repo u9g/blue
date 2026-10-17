@@ -62,7 +62,6 @@ message TurnCompleted {
   string result_text = 2;
   uint64 duration_ms = 3;
   uint32 num_turns = 4;
-  optional double cost_usd = 5;
 }
 
 message TurnFailed {

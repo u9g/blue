@@ -84,18 +84,16 @@ class ToolFinished(_message.Message):
     def __init__(self, tool_use_id: _Optional[str] = ..., is_error: _Optional[bool] = ...) -> None: ...
 
 class TurnCompleted(_message.Message):
-    __slots__ = ("turn_id", "result_text", "duration_ms", "num_turns", "cost_usd")
+    __slots__ = ("turn_id", "result_text", "duration_ms", "num_turns")
     TURN_ID_FIELD_NUMBER: _ClassVar[int]
     RESULT_TEXT_FIELD_NUMBER: _ClassVar[int]
     DURATION_MS_FIELD_NUMBER: _ClassVar[int]
     NUM_TURNS_FIELD_NUMBER: _ClassVar[int]
-    COST_USD_FIELD_NUMBER: _ClassVar[int]
     turn_id: str
     result_text: str
     duration_ms: int
     num_turns: int
-    cost_usd: float
-    def __init__(self, turn_id: _Optional[str] = ..., result_text: _Optional[str] = ..., duration_ms: _Optional[int] = ..., num_turns: _Optional[int] = ..., cost_usd: _Optional[float] = ...) -> None: ...
+    def __init__(self, turn_id: _Optional[str] = ..., result_text: _Optional[str] = ..., duration_ms: _Optional[int] = ..., num_turns: _Optional[int] = ...) -> None: ...
 
 class TurnFailed(_message.Message):
     __slots__ = ("turn_id", "reason")

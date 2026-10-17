@@ -15,8 +15,6 @@ const SUMMARY_MAX_CHARS: usize = 100;
 pub struct Translator {
     claude_session_id: Option<String>,
     cwd: String,
-    /// `total_cost_usd` on results is cumulative for the session.
-    cost_so_far: f64,
 }
 
 impl Translator {
@@ -89,11 +87,6 @@ impl Translator {
     }
 
     fn result(&mut self, message: &Value, turn_id: Option<&str>) -> Vec<Kind> {
-        let total_cost = message["total_cost_usd"].as_f64();
-        let cost = total_cost.map(|total| (total - self.cost_so_far).max(0.0));
-        if let Some(total) = total_cost {
-            self.cost_so_far = total;
-        }
         let Some(turn_id) = turn_id.map(str::to_owned) else {
             tracing::warn!("SDK result arrived with no turn in progress");
             return Vec::new();
@@ -104,7 +97,6 @@ impl Translator {
                 result_text: str_field(message, "result").to_owned(),
                 duration_ms: message["duration_ms"].as_u64().unwrap_or_default(),
                 num_turns: message["num_turns"].as_u64().unwrap_or_default() as u32,
-                cost_usd: cost,
             })];
         }
         let errors: Vec<&str> = message["errors"]
@@ -214,18 +206,6 @@ mod tests {
         assert_eq!(kinds(&mut t, init.clone(), None).len(), 1);
         assert!(kinds(&mut t, init, None).is_empty());
         assert_eq!(t.claude_session_id(), Some("abc"));
-    }
-
-    #[test]
-    fn cost_is_per_turn() {
-        let mut t = Translator::default();
-        let result = |total: f64| json!({"type": "result", "subtype": "success", "is_error": false, "result": "ok", "total_cost_usd": total});
-        let cost = |kinds: Vec<Kind>| match &kinds[..] {
-            [Kind::TurnCompleted(done)] => done.cost_usd.unwrap(),
-            other => panic!("{other:?}"),
-        };
-        assert!((cost(kinds(&mut t, result(0.10), Some("t1"))) - 0.10).abs() < 1e-9);
-        assert!((cost(kinds(&mut t, result(0.25), Some("t2"))) - 0.15).abs() < 1e-9);
     }
 
     #[test]

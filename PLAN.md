@@ -365,7 +365,7 @@ tested against recorded fixtures). `SessionEvent` is a `oneof`:
 | `AssistantText` | SDK `assistant` text blocks | `text` (complete block, not partials) |
 | `ToolStarted` | SDK `assistant` tool_use blocks | `tool_use_id, tool, summary` e.g. `Edit src/main.rs`, `Bash: cargo test` |
 | `ToolFinished` | SDK `user` tool_result blocks | `tool_use_id, is_error` |
-| `TurnCompleted` | SDK `result` (success) | `turn_id, result_text, duration_ms, num_turns, cost_usd` |
+| `TurnCompleted` | SDK `result` (success) | `turn_id, result_text, duration_ms, num_turns` |
 | `TurnFailed` | SDK `result` (error) / bridge crash | `turn_id, reason` |
 | `SessionStateChanged` | daemon | `SessionState` enum: `STARTING, IDLE, RUNNING, CLOSED, FAILED` |
 | `RawSdkMessage` | every SDK message (if `forward_raw`) | `json` |
@@ -429,7 +429,7 @@ pairing_codes  (code_hash PK, created_by, expires_at, claimed_at, machine_id)
 sessions       (id, machine_id FK, title, state, claude_session_id,
                 created_at, updated_at, last_activity_at)
 turns          (id, session_id FK, index, instructions, state  -- queued|running|completed|failed
-                , result_text, cost_usd, duration_ms, error, created_at, started_at, finished_at)
+                , result_text, duration_ms, error, created_at, started_at, finished_at)
 events         (id BIGSERIAL PK  -- global cursor
                 , session_id FK, turn_id FK NULL, seq, kind, payload JSONB, is_raw BOOL,
                 created_at, UNIQUE(session_id, seq))
@@ -487,9 +487,8 @@ restricted permissions.
   process group, size-delimited protobuf I/O, stderr forwarded to `tracing` (target `bridge`),
   kill-tree on drop.
 - `translate` (phase 1) — raw `SDKMessage` → events (§5.5), snapshot-tested on recordings.
-  Claude Code repeats `init` every turn (reported once); `total_cost_usd` is cumulative (each
-  turn reports its difference); subagent messages are skipped; any unsuccessful `result` is
-  `TurnFailed`.
+  Claude Code repeats `init` every turn (reported once); subagent messages are skipped; any
+  unsuccessful `result` is `TurnFailed`. Cost isn't tracked.
 - `recorder` (phase 1) — writes raw SDK messages to JSON lines, scrubbed for the public repo
   (home dir → `<HOME>`, `init` reduced to the fields Blue uses, `rate_limit_event` dropped).
 - `outbox` — SQLite (`sqlx` sqlite): `(session_id, seq, payload)`; append before send,

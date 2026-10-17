@@ -145,13 +145,9 @@ fn print_event(kind: Kind) {
         Kind::AssistantText(text) => println!("{}", text.text),
         Kind::ToolStarted(tool) => println!("  → {}", tool.summary),
         Kind::ToolFinished(tool) if tool.is_error => println!("  ✗ tool call failed"),
-        Kind::TurnCompleted(done) => println!(
-            "✓ done in {:.1}s{}",
-            done.duration_ms as f64 / 1000.0,
-            done.cost_usd
-                .map(|cost| format!(", ${cost:.4}"))
-                .unwrap_or_default()
-        ),
+        Kind::TurnCompleted(done) => {
+            println!("✓ done in {:.1}s", done.duration_ms as f64 / 1000.0)
+        }
         Kind::TurnFailed(failed) => println!("✗ turn failed: {}", failed.reason),
         Kind::SessionStateChanged(changed) => match changed.state() {
             SessionState::Failed => println!("✗ session failed"),
