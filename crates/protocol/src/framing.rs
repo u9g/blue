@@ -72,11 +72,11 @@ async fn read_varint<R: AsyncRead + Unpin>(reader: &mut R) -> io::Result<Option<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::v1::{BridgeOutput, Ready, SdkMessage, bridge_output::Event};
+    use crate::bridge::v1::{BridgeToDaemon, Ready, SdkMessage, bridge_to_daemon::Event};
     use tokio::io::BufReader;
 
-    fn ready() -> BridgeOutput {
-        BridgeOutput {
+    fn ready() -> BridgeToDaemon {
+        BridgeToDaemon {
             event: Some(Event::Ready(Ready {
                 protocol_version: crate::PROTOCOL_VERSION,
                 bridge_version: "0.1.0".into(),
@@ -88,7 +88,7 @@ mod tests {
 
     #[tokio::test]
     async fn round_trips_frames_then_clean_eof() {
-        let big = BridgeOutput {
+        let big = BridgeToDaemon {
             event: Some(Event::SdkMessage(SdkMessage {
                 json: "x".repeat(300_000),
             })),
@@ -103,22 +103,25 @@ mod tests {
         };
         let mut rx = BufReader::new(rx);
         assert_eq!(
-            read_frame::<_, BridgeOutput>(&mut rx).await.unwrap(),
+            read_frame::<_, BridgeToDaemon>(&mut rx).await.unwrap(),
             Some(ready())
         );
         assert_eq!(
-            read_frame::<_, BridgeOutput>(&mut rx).await.unwrap(),
+            read_frame::<_, BridgeToDaemon>(&mut rx).await.unwrap(),
             Some(big)
         );
         writer.await.unwrap();
-        assert_eq!(read_frame::<_, BridgeOutput>(&mut rx).await.unwrap(), None);
+        assert_eq!(
+            read_frame::<_, BridgeToDaemon>(&mut rx).await.unwrap(),
+            None
+        );
     }
 
     #[tokio::test]
     async fn truncated_frame_is_an_error() {
         let bytes = ready().encode_length_delimited_to_vec();
         let mut rx = &bytes[..bytes.len() - 1];
-        let err = read_frame::<_, BridgeOutput>(&mut rx).await.unwrap_err();
+        let err = read_frame::<_, BridgeToDaemon>(&mut rx).await.unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
     }
 
@@ -127,7 +130,7 @@ mod tests {
         let mut bytes = Vec::new();
         prost::encoding::encode_varint(MAX_FRAME_LEN + 1, &mut bytes);
         let mut rx = &bytes[..];
-        let err = read_frame::<_, BridgeOutput>(&mut rx).await.unwrap_err();
+        let err = read_frame::<_, BridgeToDaemon>(&mut rx).await.unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidData);
     }
 }

@@ -2,23 +2,23 @@ import { expect, test } from "bun:test";
 import { create } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream, sizeDelimitedEncode } from "@bufbuild/protobuf/wire";
 import {
-  BridgeInputSchema,
-  BridgeOutputSchema,
-  type BridgeOutput,
+  DaemonToBridgeSchema,
+  BridgeToDaemonSchema,
+  type BridgeToDaemon,
 } from "../src/gen/blue/bridge/v1/bridge_pb.ts";
 
 const MAIN = new URL("../src/main.ts", import.meta.url).pathname.replace(/^\/(\w:)/, "$1");
 
 function spawnBridge() {
   const proc = Bun.spawn(["bun", MAIN], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
-  const frames = sizeDelimitedDecodeStream(BridgeOutputSchema, proc.stdout)[Symbol.asyncIterator]();
-  const next = async (): Promise<BridgeOutput["event"]> => {
+  const frames = sizeDelimitedDecodeStream(BridgeToDaemonSchema, proc.stdout)[Symbol.asyncIterator]();
+  const next = async (): Promise<BridgeToDaemon["event"]> => {
     const { value, done } = await frames.next();
     if (done) throw new Error("bridge closed stdout");
     return value.event;
   };
-  const sendInput = (command: Parameters<typeof create<typeof BridgeInputSchema>>[1]) => {
-    proc.stdin.write(sizeDelimitedEncode(BridgeInputSchema, create(BridgeInputSchema, command)));
+  const sendInput = (command: Parameters<typeof create<typeof DaemonToBridgeSchema>>[1]) => {
+    proc.stdin.write(sizeDelimitedEncode(DaemonToBridgeSchema, create(DaemonToBridgeSchema, command)));
     proc.stdin.flush();
   };
   return { proc, next, sendInput };

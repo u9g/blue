@@ -8,8 +8,7 @@ package blue.bridge.v1;
 // ("size-delimited"). stdout carries only frames; the bridge logs to stderr.
 // One bridge process hosts exactly one session.
 
-// Daemon -> bridge.
-message BridgeInput {
+message DaemonToBridge {
   oneof command {
     Start start = 1;
     Prompt prompt = 2;
@@ -18,8 +17,7 @@ message BridgeInput {
   }
 }
 
-// Bridge -> daemon.
-message BridgeOutput {
+message BridgeToDaemon {
   oneof event {
     Ready ready = 1;
     SdkMessage sdk_message = 2;

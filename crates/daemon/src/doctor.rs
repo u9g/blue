@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::{Context, bail};
 use blue_protocol::PROTOCOL_VERSION;
 use blue_protocol::bridge::v1::{
-    BridgeInput, BridgeOutput, Close, Ready, bridge_input, bridge_output,
+    BridgeToDaemon, Close, DaemonToBridge, Ready, bridge_to_daemon, daemon_to_bridge,
 };
 use blue_protocol::framing::{read_frame, write_frame};
 use tokio::io::{AsyncRead, BufReader};
@@ -72,7 +72,7 @@ async fn bridge_handshake(bridge: &Path) -> anyhow::Result<Ready> {
     let mut stdout = BufReader::new(child.stdout.take().context("bridge stdout")?);
 
     let ready = match next_event(&mut stdout).await? {
-        bridge_output::Event::Ready(ready) => ready,
+        bridge_to_daemon::Event::Ready(ready) => ready,
         other => bail!("expected Ready as the bridge's first frame, got {other:?}"),
     };
     if ready.protocol_version != PROTOCOL_VERSION {
@@ -82,12 +82,12 @@ async fn bridge_handshake(bridge: &Path) -> anyhow::Result<Ready> {
         );
     }
 
-    let close = BridgeInput {
-        command: Some(bridge_input::Command::Close(Close {})),
+    let close = DaemonToBridge {
+        command: Some(daemon_to_bridge::Command::Close(Close {})),
     };
     write_frame(&mut stdin, &close).await?;
     match next_event(&mut stdout).await? {
-        bridge_output::Event::Exited(exited) if exited.error.is_empty() => {}
+        bridge_to_daemon::Event::Exited(exited) if exited.error.is_empty() => {}
         other => bail!("expected a clean Exited after Close, got {other:?}"),
     }
 
@@ -98,8 +98,10 @@ async fn bridge_handshake(bridge: &Path) -> anyhow::Result<Ready> {
     Ok(ready)
 }
 
-async fn next_event<R: AsyncRead + Unpin>(stdout: &mut R) -> anyhow::Result<bridge_output::Event> {
-    read_frame::<_, BridgeOutput>(stdout)
+async fn next_event<R: AsyncRead + Unpin>(
+    stdout: &mut R,
+) -> anyhow::Result<bridge_to_daemon::Event> {
+    read_frame::<_, BridgeToDaemon>(stdout)
         .await?
         .context("bridge closed stdout")?
         .event

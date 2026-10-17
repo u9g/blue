@@ -10,16 +10,14 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file blue/bridge/v1/bridge.proto.
  */
 export const file_blue_bridge_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IpIBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEhMKC2NsYXVkZV9wYXRoGAIgASgJEiUKGHJlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZBgDIAEoCUgAiAEBEhIKBW1vZGVsGAQgASgJSAGIAQFCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiCwoJSW50ZXJydXB0IgcKBUNsb3NlImcKBVJlYWR5EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SFgoOYnJpZGdlX3ZlcnNpb24YAiABKAkSEwoLc2RrX3ZlcnNpb24YAyABKAkSFwoPcnVudGltZV92ZXJzaW9uGAQgASgJIhoKClNka01lc3NhZ2USDAoEanNvbhgBIAEoCSIYCgVFcnJvchIPCgdtZXNzYWdlGAEgASgJIhcKBkV4aXRlZBINCgVlcnJvchgBIAEoCWIGcHJvdG8z");
+  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsUBCg5EYWVtb25Ub0JyaWRnZRImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixgEKDkJyaWRnZVRvRGFlbW9uEiYKBXJlYWR5GAEgASgLMhUuYmx1ZS5icmlkZ2UudjEuUmVhZHlIABIxCgtzZGtfbWVzc2FnZRgCIAEoCzIaLmJsdWUuYnJpZGdlLnYxLlNka01lc3NhZ2VIABImCgVlcnJvchgDIAEoCzIVLmJsdWUuYnJpZGdlLnYxLkVycm9ySAASKAoGZXhpdGVkGAQgASgLMhYuYmx1ZS5icmlkZ2UudjEuRXhpdGVkSABCBwoFZXZlbnQikgEKBVN0YXJ0EhIKCnNlc3Npb25faWQYASABKAkSEwoLY2xhdWRlX3BhdGgYAiABKAkSJQoYcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkGAMgASgJSACIAQESEgoFbW9kZWwYBCABKAlIAYgBAUIbChlfcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkQggKBl9tb2RlbCIWCgZQcm9tcHQSDAoEdGV4dBgBIAEoCSILCglJbnRlcnJ1cHQiBwoFQ2xvc2UiZwoFUmVhZHkSGAoQcHJvdG9jb2xfdmVyc2lvbhgBIAEoDRIWCg5icmlkZ2VfdmVyc2lvbhgCIAEoCRITCgtzZGtfdmVyc2lvbhgDIAEoCRIXCg9ydW50aW1lX3ZlcnNpb24YBCABKAkiGgoKU2RrTWVzc2FnZRIMCgRqc29uGAEgASgJIhgKBUVycm9yEg8KB21lc3NhZ2UYASABKAkiFwoGRXhpdGVkEg0KBWVycm9yGAEgASgJYgZwcm90bzM");
 
 /**
- * Daemon -> bridge.
- *
- * @generated from message blue.bridge.v1.BridgeInput
+ * @generated from message blue.bridge.v1.DaemonToBridge
  */
-export type BridgeInput = Message<"blue.bridge.v1.BridgeInput"> & {
+export type DaemonToBridge = Message<"blue.bridge.v1.DaemonToBridge"> & {
   /**
-   * @generated from oneof blue.bridge.v1.BridgeInput.command
+   * @generated from oneof blue.bridge.v1.DaemonToBridge.command
    */
   command: {
     /**
@@ -49,20 +47,18 @@ export type BridgeInput = Message<"blue.bridge.v1.BridgeInput"> & {
 };
 
 /**
- * Describes the message blue.bridge.v1.BridgeInput.
- * Use `create(BridgeInputSchema)` to create a new message.
+ * Describes the message blue.bridge.v1.DaemonToBridge.
+ * Use `create(DaemonToBridgeSchema)` to create a new message.
  */
-export const BridgeInputSchema: GenMessage<BridgeInput> = /*@__PURE__*/
+export const DaemonToBridgeSchema: GenMessage<DaemonToBridge> = /*@__PURE__*/
   messageDesc(file_blue_bridge_v1_bridge, 0);
 
 /**
- * Bridge -> daemon.
- *
- * @generated from message blue.bridge.v1.BridgeOutput
+ * @generated from message blue.bridge.v1.BridgeToDaemon
  */
-export type BridgeOutput = Message<"blue.bridge.v1.BridgeOutput"> & {
+export type BridgeToDaemon = Message<"blue.bridge.v1.BridgeToDaemon"> & {
   /**
-   * @generated from oneof blue.bridge.v1.BridgeOutput.event
+   * @generated from oneof blue.bridge.v1.BridgeToDaemon.event
    */
   event: {
     /**
@@ -92,10 +88,10 @@ export type BridgeOutput = Message<"blue.bridge.v1.BridgeOutput"> & {
 };
 
 /**
- * Describes the message blue.bridge.v1.BridgeOutput.
- * Use `create(BridgeOutputSchema)` to create a new message.
+ * Describes the message blue.bridge.v1.BridgeToDaemon.
+ * Use `create(BridgeToDaemonSchema)` to create a new message.
  */
-export const BridgeOutputSchema: GenMessage<BridgeOutput> = /*@__PURE__*/
+export const BridgeToDaemonSchema: GenMessage<BridgeToDaemon> = /*@__PURE__*/
   messageDesc(file_blue_bridge_v1_bridge, 1);
 
 /**

@@ -205,12 +205,12 @@ Framing: each frame is a protobuf varint length followed by that many bytes of m
 the standard "size-delimited" format (`prost::Message::encode_length_delimited` in Rust,
 `sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`).
 
-- Daemon → bridge: `BridgeInput { oneof command { Start, Prompt, Interrupt, Close } }`
+- Daemon → bridge: `DaemonToBridge { oneof command { Start, Prompt, Interrupt, Close } }`
   - `Start { session_id, claude_path, resume_claude_session_id?, model? }`
   - `Prompt { text }` — no turn id: the server sends a session's next prompt only after the
     current turn ends, so the daemon always knows which turn the bridge is running
   - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
-- Bridge → daemon: `BridgeOutput { oneof event { Ready, SdkMessage, Error, Exited } }`
+- Bridge → daemon: `BridgeToDaemon { oneof event { Ready, SdkMessage, Error, Exited } }`
   - `Ready { protocol_version, bridge_version, sdk_version, runtime_version }` — sent first
   - `SdkMessage { json }` — the `SDKMessage` exactly as the SDK yielded it, `JSON.stringify`'d.
     This is the one deliberate opaque field: the SDK's message shapes are Anthropic's and change
@@ -476,7 +476,7 @@ restricted permissions.
 
 - Bun + TypeScript; depends only on `@anthropic-ai/claude-agent-sdk` (pinned exact version) and
   `@bufbuild/protobuf`.
-- ~200 lines: decode size-delimited `BridgeInput` frames from stdin, one `query()` per
+- ~200 lines: decode size-delimited `DaemonToBridge` frames from stdin, one `query()` per
   process, async-iterable input queue for prompts, forward every yielded message as
   `SdkMessage { json }`, handle `Interrupt`/`Close`, emit `Exited`.
 - Always passes `pathToClaudeCodeExecutable` from `Start.claude_path` (the machine's installed

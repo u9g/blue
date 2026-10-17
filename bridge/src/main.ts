@@ -1,20 +1,20 @@
 // claude-bridge: a stdio adapter between blue-daemon and the Claude Agent SDK.
 //
-// Reads size-delimited BridgeInput frames from stdin and writes size-delimited BridgeOutput
+// Reads size-delimited DaemonToBridge frames from stdin and writes size-delimited BridgeToDaemon
 // frames to stdout. stdout carries protocol frames only; all logging goes to stderr.
 
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { sizeDelimitedDecodeStream, sizeDelimitedEncode } from "@bufbuild/protobuf/wire";
 import pkg from "../package.json";
-import { BridgeInputSchema, BridgeOutputSchema } from "./gen/blue/bridge/v1/bridge_pb.ts";
+import { DaemonToBridgeSchema, BridgeToDaemonSchema } from "./gen/blue/bridge/v1/bridge_pb.ts";
 
 // Must match blue_protocol::PROTOCOL_VERSION in Rust.
 const PROTOCOL_VERSION = 1;
 
-type OutputEvent = MessageInitShape<typeof BridgeOutputSchema>["event"];
+type OutputEvent = MessageInitShape<typeof BridgeToDaemonSchema>["event"];
 
 function send(event: OutputEvent): Promise<void> {
-  const frame = sizeDelimitedEncode(BridgeOutputSchema, create(BridgeOutputSchema, { event }));
+  const frame = sizeDelimitedEncode(BridgeToDaemonSchema, create(BridgeToDaemonSchema, { event }));
   return new Promise((resolve, reject) =>
     process.stdout.write(frame, (err) => (err ? reject(err) : resolve())),
   );
@@ -31,7 +31,7 @@ async function main(): Promise<number> {
     },
   });
 
-  for await (const input of sizeDelimitedDecodeStream(BridgeInputSchema, Bun.stdin.stream())) {
+  for await (const input of sizeDelimitedDecodeStream(DaemonToBridgeSchema, Bun.stdin.stream())) {
     switch (input.command.case) {
       case "close":
         await send({ case: "exited", value: {} });
