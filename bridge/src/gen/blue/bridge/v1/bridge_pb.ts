@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file blue/bridge/v1/bridge.proto.
  */
 export const file_blue_bridge_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IpIBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEhMKC2NsYXVkZV9wYXRoGAIgASgJEiUKGHJlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZBgDIAEoCUgAiAEBEhIKBW1vZGVsGAQgASgJSAGIAQFCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiJwoGUHJvbXB0Eg8KB3R1cm5faWQYASABKAkSDAoEdGV4dBgCIAEoCSILCglJbnRlcnJ1cHQiBwoFQ2xvc2UiZwoFUmVhZHkSGAoQcHJvdG9jb2xfdmVyc2lvbhgBIAEoDRIWCg5icmlkZ2VfdmVyc2lvbhgCIAEoCRITCgtzZGtfdmVyc2lvbhgDIAEoCRIXCg9ydW50aW1lX3ZlcnNpb24YBCABKAkiGgoKU2RrTWVzc2FnZRIMCgRqc29uGAEgASgJIicKBUVycm9yEg8KB21lc3NhZ2UYASABKAkSDQoFZmF0YWwYAiABKAgiFgoGRXhpdGVkEgwKBGNvZGUYASABKAViBnByb3RvMw");
+  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsIBCgtCcmlkZ2VJbnB1dBImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixAEKDEJyaWRnZU91dHB1dBImCgVyZWFkeRgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlJlYWR5SAASMQoLc2RrX21lc3NhZ2UYAiABKAsyGi5ibHVlLmJyaWRnZS52MS5TZGtNZXNzYWdlSAASJgoFZXJyb3IYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5FcnJvckgAEigKBmV4aXRlZBgEIAEoCzIWLmJsdWUuYnJpZGdlLnYxLkV4aXRlZEgAQgcKBWV2ZW50IpIBCgVTdGFydBISCgpzZXNzaW9uX2lkGAEgASgJEhMKC2NsYXVkZV9wYXRoGAIgASgJEiUKGHJlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZBgDIAEoCUgAiAEBEhIKBW1vZGVsGAQgASgJSAGIAQFCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiCwoJSW50ZXJydXB0IgcKBUNsb3NlImcKBVJlYWR5EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SFgoOYnJpZGdlX3ZlcnNpb24YAiABKAkSEwoLc2RrX3ZlcnNpb24YAyABKAkSFwoPcnVudGltZV92ZXJzaW9uGAQgASgJIhoKClNka01lc3NhZ2USDAoEanNvbhgBIAEoCSInCgVFcnJvchIPCgdtZXNzYWdlGAEgASgJEg0KBWZhdGFsGAIgASgIIhYKBkV4aXRlZBIMCgRjb2RlGAEgASgFYgZwcm90bzM");
 
 /**
  * Daemon -> bridge.
@@ -141,17 +141,14 @@ export const StartSchema: GenMessage<Start> = /*@__PURE__*/
 
 /**
  * Sends one user turn into the running query.
+ * The bridge runs one turn at a time and doesn't track turn ids; the daemon knows which turn
+ * is in progress and tags events with it.
  *
  * @generated from message blue.bridge.v1.Prompt
  */
 export type Prompt = Message<"blue.bridge.v1.Prompt"> & {
   /**
-   * @generated from field: string turn_id = 1;
-   */
-  turnId: string;
-
-  /**
-   * @generated from field: string text = 2;
+   * @generated from field: string text = 1;
    */
   text: string;
 };

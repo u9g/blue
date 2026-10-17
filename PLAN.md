@@ -207,7 +207,8 @@ the standard "size-delimited" format (`prost::Message::encode_length_delimited` 
 
 - Daemon → bridge: `BridgeInput { oneof command { Start, Prompt, Interrupt, Close } }`
   - `Start { session_id, claude_path, resume_claude_session_id?, model? }`
-  - `Prompt { turn_id, text }`
+  - `Prompt { text }` — no turn id: the server sends a session's next prompt only after the
+    current turn ends, so the daemon always knows which turn the bridge is running
   - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
 - Bridge → daemon: `BridgeOutput { oneof event { Ready, SdkMessage, Error, Exited } }`
   - `Ready { protocol_version, bridge_version, sdk_version, runtime_version }` — sent first

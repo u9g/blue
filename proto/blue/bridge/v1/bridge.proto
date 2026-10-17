@@ -42,9 +42,10 @@ message Start {
 }
 
 // Sends one user turn into the running query.
+// The bridge runs one turn at a time and doesn't track turn ids; the daemon knows which turn
+// is in progress and tags events with it.
 message Prompt {
-  string turn_id = 1;
-  string text = 2;
+  string text = 1;
 }
 
 // Interrupts the current turn (query.interrupt()).
