@@ -44,9 +44,8 @@ export async function scoutProjectDirectory(options: {
   request: string;
   startDir: string;
   claudePath: string;
-  signal: AbortSignal;
 }): Promise<string | undefined> {
-  const { request, startDir, claudePath, signal } = options;
+  const { request, startDir, claudePath } = options;
   let chosen: string | undefined;
 
   const blue = createSdkMcpServer({
@@ -72,9 +71,6 @@ export async function scoutProjectDirectory(options: {
     ],
   });
 
-  const abortController = new AbortController();
-  signal.addEventListener("abort", () => abortController.abort(), { once: true });
-
   // Custom SDK tools need streaming input, hence the one-message generator.
   async function* input() {
     yield userMessage(`The user's request:\n\n${request}`);
@@ -92,7 +88,6 @@ export async function scoutProjectDirectory(options: {
       mcpServers: { blue },
       settingSources: [],
       persistSession: false,
-      abortController,
     },
   });
 
@@ -106,7 +101,7 @@ export async function scoutProjectDirectory(options: {
       if (chosen || message.type === "result") break;
     }
   } catch (err) {
-    if (!signal.aborted) log(`scouting failed: ${err}`);
+    log(`scouting failed: ${err}`);
   } finally {
     scouting.close();
   }

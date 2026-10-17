@@ -28,7 +28,7 @@ enum Command {
         paths: Paths,
     },
     /// Run a Claude session in this terminal, without a server. Each line you type is a prompt;
-    /// `/interrupt` stops the running turn and `/quit` ends the session.
+    /// `/quit` ends the session once the running turn finishes.
     Session {
         #[command(flatten)]
         paths: Paths,
@@ -122,10 +122,9 @@ async fn interactive(mut session: Session) -> anyhow::Result<()> {
                     stdin_open = false;
                     session.close().await?;
                 }
-                Some("/interrupt") => session.interrupt().await?,
                 Some("") => {}
                 Some(_) if session.turn_running() => {
-                    println!("(a turn is still running: wait, or type /interrupt)");
+                    println!("(a turn is still running; wait for it to finish)");
                 }
                 Some(text) => {
                     turns += 1;
@@ -164,7 +163,6 @@ fn print_event(kind: Kind) {
                 .unwrap_or_default()
         ),
         Kind::TurnFailed(failed) => println!("✗ turn failed: {}", failed.reason),
-        Kind::TurnInterrupted(_) => println!("■ interrupted"),
         Kind::SessionStateChanged(changed) => match changed.state() {
             SessionState::Failed => println!("✗ session failed"),
             SessionState::Closed => println!("● session closed"),

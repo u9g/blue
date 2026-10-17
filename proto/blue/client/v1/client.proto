@@ -14,7 +14,6 @@ service ClientService {
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
   // Sends a follow-up turn. Queued if a turn is already running.
   rpc SendPrompt(SendPromptRequest) returns (SendPromptResponse);
-  rpc InterruptSession(InterruptSessionRequest) returns (InterruptSessionResponse);
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
   // Streams events from `cursor` onward, then live events.
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
@@ -26,7 +25,6 @@ enum TurnState {
   TURN_STATE_RUNNING = 2;
   TURN_STATE_COMPLETED = 3;
   TURN_STATE_FAILED = 4;
-  TURN_STATE_INTERRUPTED = 5;
 }
 
 message Machine {
@@ -128,12 +126,6 @@ message SendPromptRequest {
 message SendPromptResponse {
   string turn_id = 1;
 }
-
-message InterruptSessionRequest {
-  string session_id = 1;
-}
-
-message InterruptSessionResponse {}
 
 message GetSessionRequest {
   string session_id = 1;

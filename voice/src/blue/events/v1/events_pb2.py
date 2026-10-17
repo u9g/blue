@@ -24,35 +24,33 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x62lue/events/v1/events.proto\x12\x0e\x62lue.events.v1\"\xd4\x04\n\x0cSessionEvent\x12\x39\n\x0fsession_started\x18\x01 \x01(\x0b\x32\x1e.blue.events.v1.SessionStartedH\x00\x12\x33\n\x0cturn_started\x18\x02 \x01(\x0b\x32\x1b.blue.events.v1.TurnStartedH\x00\x12\x37\n\x0e\x61ssistant_text\x18\x03 \x01(\x0b\x32\x1d.blue.events.v1.AssistantTextH\x00\x12\x33\n\x0ctool_started\x18\x04 \x01(\x0b\x32\x1b.blue.events.v1.ToolStartedH\x00\x12\x35\n\rtool_finished\x18\x05 \x01(\x0b\x32\x1c.blue.events.v1.ToolFinishedH\x00\x12\x37\n\x0eturn_completed\x18\x06 \x01(\x0b\x32\x1d.blue.events.v1.TurnCompletedH\x00\x12\x31\n\x0bturn_failed\x18\x07 \x01(\x0b\x32\x1a.blue.events.v1.TurnFailedH\x00\x12;\n\x10turn_interrupted\x18\x08 \x01(\x0b\x32\x1f.blue.events.v1.TurnInterruptedH\x00\x12\x44\n\x15session_state_changed\x18\t \x01(\x0b\x32#.blue.events.v1.SessionStateChangedH\x00\x12\x38\n\x0fraw_sdk_message\x18\n \x01(\x0b\x32\x1d.blue.events.v1.RawSdkMessageH\x00\x42\x06\n\x04kind\"G\n\x0eSessionStarted\x12\x19\n\x11\x63laude_session_id\x18\x01 \x01(\t\x12\r\n\x05model\x18\x02 \x01(\t\x12\x0b\n\x03\x63wd\x18\x03 \x01(\t\"\x1e\n\x0bTurnStarted\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\"\x1d\n\rAssistantText\x12\x0c\n\x04text\x18\x01 \x01(\t\"A\n\x0bToolStarted\x12\x13\n\x0btool_use_id\x18\x01 \x01(\t\x12\x0c\n\x04tool\x18\x02 \x01(\t\x12\x0f\n\x07summary\x18\x03 \x01(\t\"5\n\x0cToolFinished\x12\x13\n\x0btool_use_id\x18\x01 \x01(\t\x12\x10\n\x08is_error\x18\x02 \x01(\x08\"\x81\x01\n\rTurnCompleted\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\x12\x13\n\x0bresult_text\x18\x02 \x01(\t\x12\x13\n\x0b\x64uration_ms\x18\x03 \x01(\x04\x12\x11\n\tnum_turns\x18\x04 \x01(\r\x12\x15\n\x08\x63ost_usd\x18\x05 \x01(\x01H\x00\x88\x01\x01\x42\x0b\n\t_cost_usd\"-\n\nTurnFailed\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t\"\"\n\x0fTurnInterrupted\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\"B\n\x13SessionStateChanged\x12+\n\x05state\x18\x01 \x01(\x0e\x32\x1c.blue.events.v1.SessionState\"\x1d\n\rRawSdkMessage\x12\x0c\n\x04json\x18\x01 \x01(\t*\xb0\x01\n\x0cSessionState\x12\x1d\n\x19SESSION_STATE_UNSPECIFIED\x10\x00\x12\x1a\n\x16SESSION_STATE_STARTING\x10\x01\x12\x16\n\x12SESSION_STATE_IDLE\x10\x02\x12\x19\n\x15SESSION_STATE_RUNNING\x10\x03\x12\x18\n\x14SESSION_STATE_CLOSED\x10\x04\x12\x18\n\x14SESSION_STATE_FAILED\x10\x05\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x62lue/events/v1/events.proto\x12\x0e\x62lue.events.v1\"\x97\x04\n\x0cSessionEvent\x12\x39\n\x0fsession_started\x18\x01 \x01(\x0b\x32\x1e.blue.events.v1.SessionStartedH\x00\x12\x33\n\x0cturn_started\x18\x02 \x01(\x0b\x32\x1b.blue.events.v1.TurnStartedH\x00\x12\x37\n\x0e\x61ssistant_text\x18\x03 \x01(\x0b\x32\x1d.blue.events.v1.AssistantTextH\x00\x12\x33\n\x0ctool_started\x18\x04 \x01(\x0b\x32\x1b.blue.events.v1.ToolStartedH\x00\x12\x35\n\rtool_finished\x18\x05 \x01(\x0b\x32\x1c.blue.events.v1.ToolFinishedH\x00\x12\x37\n\x0eturn_completed\x18\x06 \x01(\x0b\x32\x1d.blue.events.v1.TurnCompletedH\x00\x12\x31\n\x0bturn_failed\x18\x07 \x01(\x0b\x32\x1a.blue.events.v1.TurnFailedH\x00\x12\x44\n\x15session_state_changed\x18\x08 \x01(\x0b\x32#.blue.events.v1.SessionStateChangedH\x00\x12\x38\n\x0fraw_sdk_message\x18\t \x01(\x0b\x32\x1d.blue.events.v1.RawSdkMessageH\x00\x42\x06\n\x04kind\"G\n\x0eSessionStarted\x12\x19\n\x11\x63laude_session_id\x18\x01 \x01(\t\x12\r\n\x05model\x18\x02 \x01(\t\x12\x0b\n\x03\x63wd\x18\x03 \x01(\t\"\x1e\n\x0bTurnStarted\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\"\x1d\n\rAssistantText\x12\x0c\n\x04text\x18\x01 \x01(\t\"A\n\x0bToolStarted\x12\x13\n\x0btool_use_id\x18\x01 \x01(\t\x12\x0c\n\x04tool\x18\x02 \x01(\t\x12\x0f\n\x07summary\x18\x03 \x01(\t\"5\n\x0cToolFinished\x12\x13\n\x0btool_use_id\x18\x01 \x01(\t\x12\x10\n\x08is_error\x18\x02 \x01(\x08\"\x81\x01\n\rTurnCompleted\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\x12\x13\n\x0bresult_text\x18\x02 \x01(\t\x12\x13\n\x0b\x64uration_ms\x18\x03 \x01(\x04\x12\x11\n\tnum_turns\x18\x04 \x01(\r\x12\x15\n\x08\x63ost_usd\x18\x05 \x01(\x01H\x00\x88\x01\x01\x42\x0b\n\t_cost_usd\"-\n\nTurnFailed\x12\x0f\n\x07turn_id\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t\"B\n\x13SessionStateChanged\x12+\n\x05state\x18\x01 \x01(\x0e\x32\x1c.blue.events.v1.SessionState\"\x1d\n\rRawSdkMessage\x12\x0c\n\x04json\x18\x01 \x01(\t*\xb0\x01\n\x0cSessionState\x12\x1d\n\x19SESSION_STATE_UNSPECIFIED\x10\x00\x12\x1a\n\x16SESSION_STATE_STARTING\x10\x01\x12\x16\n\x12SESSION_STATE_IDLE\x10\x02\x12\x19\n\x15SESSION_STATE_RUNNING\x10\x03\x12\x18\n\x14SESSION_STATE_CLOSED\x10\x04\x12\x18\n\x14SESSION_STATE_FAILED\x10\x05\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'blue.events.v1.events_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_SESSIONSTATE']._serialized_start=1219
-  _globals['_SESSIONSTATE']._serialized_end=1395
+  _globals['_SESSIONSTATE']._serialized_start=1122
+  _globals['_SESSIONSTATE']._serialized_end=1298
   _globals['_SESSIONEVENT']._serialized_start=48
-  _globals['_SESSIONEVENT']._serialized_end=644
-  _globals['_SESSIONSTARTED']._serialized_start=646
-  _globals['_SESSIONSTARTED']._serialized_end=717
-  _globals['_TURNSTARTED']._serialized_start=719
-  _globals['_TURNSTARTED']._serialized_end=749
-  _globals['_ASSISTANTTEXT']._serialized_start=751
-  _globals['_ASSISTANTTEXT']._serialized_end=780
-  _globals['_TOOLSTARTED']._serialized_start=782
-  _globals['_TOOLSTARTED']._serialized_end=847
-  _globals['_TOOLFINISHED']._serialized_start=849
-  _globals['_TOOLFINISHED']._serialized_end=902
-  _globals['_TURNCOMPLETED']._serialized_start=905
-  _globals['_TURNCOMPLETED']._serialized_end=1034
-  _globals['_TURNFAILED']._serialized_start=1036
-  _globals['_TURNFAILED']._serialized_end=1081
-  _globals['_TURNINTERRUPTED']._serialized_start=1083
-  _globals['_TURNINTERRUPTED']._serialized_end=1117
-  _globals['_SESSIONSTATECHANGED']._serialized_start=1119
-  _globals['_SESSIONSTATECHANGED']._serialized_end=1185
-  _globals['_RAWSDKMESSAGE']._serialized_start=1187
-  _globals['_RAWSDKMESSAGE']._serialized_end=1216
+  _globals['_SESSIONEVENT']._serialized_end=583
+  _globals['_SESSIONSTARTED']._serialized_start=585
+  _globals['_SESSIONSTARTED']._serialized_end=656
+  _globals['_TURNSTARTED']._serialized_start=658
+  _globals['_TURNSTARTED']._serialized_end=688
+  _globals['_ASSISTANTTEXT']._serialized_start=690
+  _globals['_ASSISTANTTEXT']._serialized_end=719
+  _globals['_TOOLSTARTED']._serialized_start=721
+  _globals['_TOOLSTARTED']._serialized_end=786
+  _globals['_TOOLFINISHED']._serialized_start=788
+  _globals['_TOOLFINISHED']._serialized_end=841
+  _globals['_TURNCOMPLETED']._serialized_start=844
+  _globals['_TURNCOMPLETED']._serialized_end=973
+  _globals['_TURNFAILED']._serialized_start=975
+  _globals['_TURNFAILED']._serialized_end=1020
+  _globals['_SESSIONSTATECHANGED']._serialized_start=1022
+  _globals['_SESSIONSTATECHANGED']._serialized_end=1088
+  _globals['_RAWSDKMESSAGE']._serialized_start=1090
+  _globals['_RAWSDKMESSAGE']._serialized_end=1119
 # @@protoc_insertion_point(module_scope)

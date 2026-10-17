@@ -7,9 +7,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use anyhow::{Context, bail};
-use blue_protocol::bridge::v1::{
-    Close, Interrupt, Prompt, Start, bridge_to_daemon, daemon_to_bridge,
-};
+use blue_protocol::bridge::v1::{Close, Prompt, Start, bridge_to_daemon, daemon_to_bridge};
 use blue_protocol::daemon::v1::DaemonEvent;
 use blue_protocol::events::v1::{
     SessionEvent, SessionState, SessionStateChanged, TurnFailed, TurnStarted, session_event::Kind,
@@ -17,7 +15,7 @@ use blue_protocol::events::v1::{
 
 use crate::bridge_proc::BridgeProcess;
 use crate::recorder::Recorder;
-use crate::translate::{Translator, Turn};
+use crate::translate::Translator;
 
 pub struct SessionConfig {
     pub session_id: String,
@@ -31,17 +29,13 @@ pub struct SessionConfig {
     pub replay: Option<PathBuf>,
 }
 
-struct CurrentTurn {
-    id: String,
-    interrupted: bool,
-}
-
 pub struct Session {
     id: String,
     bridge: BridgeProcess,
     translator: Translator,
     seq: u64,
-    turn: Option<CurrentTurn>,
+    /// The turn in progress; one at a time.
+    turn: Option<String>,
     pending: VecDeque<DaemonEvent>,
     recorder: Option<Recorder>,
     closing: bool,
@@ -108,7 +102,7 @@ impl Session {
     /// Starts a turn. Only one turn runs at a time.
     pub async fn prompt(&mut self, turn_id: String, text: String) -> anyhow::Result<()> {
         if let Some(turn) = &self.turn {
-            bail!("turn {} is still running", turn.id);
+            bail!("turn {turn} is still running");
         }
         self.bridge
             .send(daemon_to_bridge::Command::Prompt(Prompt { text }))
@@ -120,25 +114,8 @@ impl Session {
             }),
         );
         self.state(SessionState::Running);
-        self.turn = Some(CurrentTurn {
-            id: turn_id,
-            interrupted: false,
-        });
+        self.turn = Some(turn_id);
         Ok(())
-    }
-
-    /// Interrupts the running turn, if any. The turn ends with `TurnInterrupted`.
-    pub async fn interrupt(&mut self) -> anyhow::Result<()> {
-        let Some(turn) = &mut self.turn else {
-            return Ok(());
-        };
-        turn.interrupted = true;
-        if let Some(recorder) = &mut self.recorder {
-            recorder.record_interrupt();
-        }
-        self.bridge
-            .send(daemon_to_bridge::Command::Interrupt(Interrupt {}))
-            .await
     }
 
     /// Asks the bridge to finish. Keep calling `next()` until it returns `None`.
@@ -187,17 +164,10 @@ impl Session {
         if let Some(recorder) = &mut self.recorder {
             recorder.record(json);
         }
-        let turn = self.turn.as_ref().map(|turn| Turn {
-            id: &turn.id,
-            interrupted: turn.interrupted,
-        });
-        for event in self.translator.translate(json, turn) {
+        for event in self.translator.translate(json, self.turn.as_deref()) {
             let Some(kind) = event.kind else { continue };
-            let ends_turn = matches!(
-                kind,
-                Kind::TurnCompleted(_) | Kind::TurnFailed(_) | Kind::TurnInterrupted(_)
-            );
-            let turn_id = self.turn.as_ref().map(|t| t.id.clone()).unwrap_or_default();
+            let ends_turn = matches!(kind, Kind::TurnCompleted(_) | Kind::TurnFailed(_));
+            let turn_id = self.turn.clone().unwrap_or_default();
             self.emit(&turn_id, kind);
             if ends_turn {
                 self.turn = None;
@@ -225,11 +195,11 @@ impl Session {
             if !stderr.is_empty() {
                 reason = format!("{reason}\n{stderr}");
             }
-            if let Some(turn) = self.turn.take() {
+            if let Some(turn_id) = self.turn.take() {
                 self.emit(
-                    &turn.id,
+                    &turn_id,
                     Kind::TurnFailed(TurnFailed {
-                        turn_id: turn.id.clone(),
+                        turn_id: turn_id.clone(),
                         reason,
                     }),
                 );
@@ -242,7 +212,7 @@ impl Session {
     }
 
     fn state(&mut self, state: SessionState) {
-        let turn_id = self.turn.as_ref().map(|t| t.id.clone()).unwrap_or_default();
+        let turn_id = self.turn.clone().unwrap_or_default();
         self.emit(
             &turn_id,
             Kind::SessionStateChanged(SessionStateChanged {

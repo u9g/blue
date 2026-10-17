@@ -107,10 +107,7 @@ async fn until(session: &mut Session, done: impl Fn(&Kind) -> bool) -> Vec<Kind>
 }
 
 fn turn_ended(kind: &Kind) -> bool {
-    matches!(
-        kind,
-        Kind::TurnCompleted(_) | Kind::TurnFailed(_) | Kind::TurnInterrupted(_)
-    )
+    matches!(kind, Kind::TurnCompleted(_) | Kind::TurnFailed(_))
 }
 
 async fn completed_turn(session: &mut Session, turn: &str, text: &str) -> String {
@@ -140,7 +137,7 @@ async fn close(mut session: Session) {
 
 #[tokio::test]
 #[ignore = "runs real Claude sessions; use `just test-live`"]
-async fn turns_interrupt_and_resume() {
+async fn turns_and_resume() {
     let scratch = scratch();
     let calc = scratch.path().join("calc");
     let mut session = start(scratch.path(), None, "turns").await;
@@ -168,25 +165,8 @@ async fn turns_interrupt_and_resume() {
     let source = std::fs::read_to_string(calc.join("calc.py")).unwrap();
     assert!(source.contains("def subtract"), "{source}");
 
-    // Turn 3: interrupted while a long command runs.
-    session
-        .prompt(
-            "t3".into(),
-            "Run exactly this shell command with Bash, in the foreground: `echo started; sleep 120; echo finished`"
-                .into(),
-        )
-        .await
-        .unwrap();
-    until(&mut session, |kind| matches!(kind, Kind::ToolStarted(_))).await;
-    session.interrupt().await.unwrap();
-    let events = until(&mut session, turn_ended).await;
-    assert!(
-        matches!(events.last(), Some(Kind::TurnInterrupted(i)) if i.turn_id == "t3"),
-        "{events:#?}"
-    );
-
-    // Turn 4: the session still works after an interrupt.
-    completed_turn(&mut session, "t4", "Reply with just the word ok.").await;
+    // Turn 3: one more turn in the same session.
+    completed_turn(&mut session, "t3", "Reply with just the word ok.").await;
 
     let claude_session_id = session.claude_session_id().unwrap().to_owned();
     let cwd = PathBuf::from(session.cwd());
@@ -196,7 +176,7 @@ async fn turns_interrupt_and_resume() {
     let mut resumed = start(&cwd, Some(claude_session_id.clone()), "resume").await;
     let answer = completed_turn(
         &mut resumed,
-        "t5",
+        "t4",
         "What function did you add to calc.py earlier? Answer with just its name.",
     )
     .await;

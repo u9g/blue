@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file blue/bridge/v1/bridge.proto.
  */
 export const file_blue_bridge_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIsUBCg5EYWVtb25Ub0JyaWRnZRImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASLgoJaW50ZXJydXB0GAMgASgLMhkuYmx1ZS5icmlkZ2UudjEuSW50ZXJydXB0SAASJgoFY2xvc2UYBCABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixgEKDkJyaWRnZVRvRGFlbW9uEiYKBXJlYWR5GAEgASgLMhUuYmx1ZS5icmlkZ2UudjEuUmVhZHlIABIxCgtzZGtfbWVzc2FnZRgCIAEoCzIaLmJsdWUuYnJpZGdlLnYxLlNka01lc3NhZ2VIABImCgVlcnJvchgDIAEoCzIVLmJsdWUuYnJpZGdlLnYxLkVycm9ySAASKAoGZXhpdGVkGAQgASgLMhYuYmx1ZS5icmlkZ2UudjEuRXhpdGVkSABCBwoFZXZlbnQinwEKBVN0YXJ0EhIKCnNlc3Npb25faWQYASABKAkSEwoLY2xhdWRlX3BhdGgYAiABKAkSJQoYcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkGAMgASgJSACIAQESEgoFbW9kZWwYBCABKAlIAYgBARILCgNjd2QYBSABKAlCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiCwoJSW50ZXJydXB0IgcKBUNsb3NlImcKBVJlYWR5EhgKEHByb3RvY29sX3ZlcnNpb24YASABKA0SFgoOYnJpZGdlX3ZlcnNpb24YAiABKAkSEwoLc2RrX3ZlcnNpb24YAyABKAkSFwoPcnVudGltZV92ZXJzaW9uGAQgASgJIhoKClNka01lc3NhZ2USDAoEanNvbhgBIAEoCSIYCgVFcnJvchIPCgdtZXNzYWdlGAEgASgJIhcKBkV4aXRlZBINCgVlcnJvchgBIAEoCWIGcHJvdG8z");
+  fileDesc("ChtibHVlL2JyaWRnZS92MS9icmlkZ2UucHJvdG8SDmJsdWUuYnJpZGdlLnYxIpUBCg5EYWVtb25Ub0JyaWRnZRImCgVzdGFydBgBIAEoCzIVLmJsdWUuYnJpZGdlLnYxLlN0YXJ0SAASKAoGcHJvbXB0GAIgASgLMhYuYmx1ZS5icmlkZ2UudjEuUHJvbXB0SAASJgoFY2xvc2UYAyABKAsyFS5ibHVlLmJyaWRnZS52MS5DbG9zZUgAQgkKB2NvbW1hbmQixgEKDkJyaWRnZVRvRGFlbW9uEiYKBXJlYWR5GAEgASgLMhUuYmx1ZS5icmlkZ2UudjEuUmVhZHlIABIxCgtzZGtfbWVzc2FnZRgCIAEoCzIaLmJsdWUuYnJpZGdlLnYxLlNka01lc3NhZ2VIABImCgVlcnJvchgDIAEoCzIVLmJsdWUuYnJpZGdlLnYxLkVycm9ySAASKAoGZXhpdGVkGAQgASgLMhYuYmx1ZS5icmlkZ2UudjEuRXhpdGVkSABCBwoFZXZlbnQinwEKBVN0YXJ0EhIKCnNlc3Npb25faWQYASABKAkSEwoLY2xhdWRlX3BhdGgYAiABKAkSJQoYcmVzdW1lX2NsYXVkZV9zZXNzaW9uX2lkGAMgASgJSACIAQESEgoFbW9kZWwYBCABKAlIAYgBARILCgNjd2QYBSABKAlCGwoZX3Jlc3VtZV9jbGF1ZGVfc2Vzc2lvbl9pZEIICgZfbW9kZWwiFgoGUHJvbXB0EgwKBHRleHQYASABKAkiBwoFQ2xvc2UiZwoFUmVhZHkSGAoQcHJvdG9jb2xfdmVyc2lvbhgBIAEoDRIWCg5icmlkZ2VfdmVyc2lvbhgCIAEoCRITCgtzZGtfdmVyc2lvbhgDIAEoCRIXCg9ydW50aW1lX3ZlcnNpb24YBCABKAkiGgoKU2RrTWVzc2FnZRIMCgRqc29uGAEgASgJIhgKBUVycm9yEg8KB21lc3NhZ2UYASABKAkiFwoGRXhpdGVkEg0KBWVycm9yGAEgASgJYgZwcm90bzM");
 
 /**
  * @generated from message blue.bridge.v1.DaemonToBridge
@@ -33,13 +33,7 @@ export type DaemonToBridge = Message<"blue.bridge.v1.DaemonToBridge"> & {
     case: "prompt";
   } | {
     /**
-     * @generated from field: blue.bridge.v1.Interrupt interrupt = 3;
-     */
-    value: Interrupt;
-    case: "interrupt";
-  } | {
-    /**
-     * @generated from field: blue.bridge.v1.Close close = 4;
+     * @generated from field: blue.bridge.v1.Close close = 3;
      */
     value: Close;
     case: "close";
@@ -171,21 +165,6 @@ export const PromptSchema: GenMessage<Prompt> = /*@__PURE__*/
   messageDesc(file_blue_bridge_v1_bridge, 3);
 
 /**
- * Interrupts the current turn (query.interrupt()).
- *
- * @generated from message blue.bridge.v1.Interrupt
- */
-export type Interrupt = Message<"blue.bridge.v1.Interrupt"> & {
-};
-
-/**
- * Describes the message blue.bridge.v1.Interrupt.
- * Use `create(InterruptSchema)` to create a new message.
- */
-export const InterruptSchema: GenMessage<Interrupt> = /*@__PURE__*/
-  messageDesc(file_blue_bridge_v1_bridge, 4);
-
-/**
  * Ends the input stream; the bridge finishes and exits 0.
  *
  * @generated from message blue.bridge.v1.Close
@@ -198,7 +177,7 @@ export type Close = Message<"blue.bridge.v1.Close"> & {
  * Use `create(CloseSchema)` to create a new message.
  */
 export const CloseSchema: GenMessage<Close> = /*@__PURE__*/
-  messageDesc(file_blue_bridge_v1_bridge, 5);
+  messageDesc(file_blue_bridge_v1_bridge, 4);
 
 /**
  * First frame the bridge writes after starting.
@@ -236,7 +215,7 @@ export type Ready = Message<"blue.bridge.v1.Ready"> & {
  * Use `create(ReadySchema)` to create a new message.
  */
 export const ReadySchema: GenMessage<Ready> = /*@__PURE__*/
-  messageDesc(file_blue_bridge_v1_bridge, 6);
+  messageDesc(file_blue_bridge_v1_bridge, 5);
 
 /**
  * One SDKMessage exactly as the SDK yielded it, serialized with JSON.stringify.
@@ -255,7 +234,7 @@ export type SdkMessage = Message<"blue.bridge.v1.SdkMessage"> & {
  * Use `create(SdkMessageSchema)` to create a new message.
  */
 export const SdkMessageSchema: GenMessage<SdkMessage> = /*@__PURE__*/
-  messageDesc(file_blue_bridge_v1_bridge, 7);
+  messageDesc(file_blue_bridge_v1_bridge, 6);
 
 /**
  * Something went wrong but the bridge keeps running, e.g. a command it can't handle.
@@ -275,7 +254,7 @@ export type Error = Message<"blue.bridge.v1.Error"> & {
  * Use `create(ErrorSchema)` to create a new message.
  */
 export const ErrorSchema: GenMessage<Error> = /*@__PURE__*/
-  messageDesc(file_blue_bridge_v1_bridge, 8);
+  messageDesc(file_blue_bridge_v1_bridge, 7);
 
 /**
  * The bridge's last frame before it exits. The daemon reads the process exit status from the
@@ -297,5 +276,5 @@ export type Exited = Message<"blue.bridge.v1.Exited"> & {
  * Use `create(ExitedSchema)` to create a new message.
  */
 export const ExitedSchema: GenMessage<Exited> = /*@__PURE__*/
-  messageDesc(file_blue_bridge_v1_bridge, 9);
+  messageDesc(file_blue_bridge_v1_bridge, 8);
 

@@ -12,8 +12,7 @@ message DaemonToBridge {
   oneof command {
     Start start = 1;
     Prompt prompt = 2;
-    Interrupt interrupt = 3;
-    Close close = 4;
+    Close close = 3;
   }
 }
 
@@ -54,9 +53,6 @@ message Start {
 message Prompt {
   string text = 1;
 }
-
-// Interrupts the current turn (query.interrupt()).
-message Interrupt {}
 
 // Ends the input stream; the bridge finishes and exits 0.
 message Close {}

@@ -18,13 +18,11 @@ class TurnState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     TURN_STATE_RUNNING: _ClassVar[TurnState]
     TURN_STATE_COMPLETED: _ClassVar[TurnState]
     TURN_STATE_FAILED: _ClassVar[TurnState]
-    TURN_STATE_INTERRUPTED: _ClassVar[TurnState]
 TURN_STATE_UNSPECIFIED: TurnState
 TURN_STATE_QUEUED: TurnState
 TURN_STATE_RUNNING: TurnState
 TURN_STATE_COMPLETED: TurnState
 TURN_STATE_FAILED: TurnState
-TURN_STATE_INTERRUPTED: TurnState
 
 class Machine(_message.Message):
     __slots__ = ("id", "name", "online", "os", "last_seen_at")
@@ -173,16 +171,6 @@ class SendPromptResponse(_message.Message):
     TURN_ID_FIELD_NUMBER: _ClassVar[int]
     turn_id: str
     def __init__(self, turn_id: _Optional[str] = ...) -> None: ...
-
-class InterruptSessionRequest(_message.Message):
-    __slots__ = ("session_id",)
-    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
-    session_id: str
-    def __init__(self, session_id: _Optional[str] = ...) -> None: ...
-
-class InterruptSessionResponse(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
 
 class GetSessionRequest(_message.Message):
     __slots__ = ("session_id",)

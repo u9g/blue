@@ -41,7 +41,7 @@ just test        # all tests
 just handshake   # build the bridge exe; daemon completes the protobuf handshake with it
 just session     # chat with Claude in this terminal via daemon + bridge (no server needed)
 just test-replay # daemon drives the compiled bridge through a recorded session (no login needed)
-just test-live   # real Claude sessions: turns, interrupt, resume, kill (needs a login; Haiku)
+just test-live   # real Claude sessions: turns, resume, kill (needs a login; Haiku)
 just server         # run the server on 127.0.0.1:50051
 just health      # gRPC health check against the server
 just voice       # run the voice agent as a local dev worker (needs voice/.env.local)

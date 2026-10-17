@@ -19,7 +19,7 @@ per-machine daemons that we own, and with voice as the frontend.
 - Speak a task ("on my desktop, in the blue repo, add a health endpoint") and have Claude Code
   do it on that machine.
 - Hear back when work finishes, with a short spoken summary; ask "what's it doing?" any time.
-- Follow up, interrupt, and switch between sessions and machines by voice.
+- Follow up and switch between sessions and machines by voice.
 - Multiple machines, each connecting outbound to the server (no inbound ports, works behind NAT).
 - Sessions survive server restarts, daemon restarts, and network drops.
 - Server is a Helm chart deployable to a self-run Kubernetes cluster, backed by external Postgres.
@@ -205,12 +205,12 @@ Framing: each frame is a protobuf varint length followed by that many bytes of m
 the standard "size-delimited" format (`prost::Message::encode_length_delimited` in Rust,
 `sizeDelimitedEncode` / `sizeDelimitedDecodeStream` in `@bufbuild/protobuf/wire`).
 
-- Daemon → bridge: `DaemonToBridge { oneof command { Start, Prompt, Interrupt, Close } }`
+- Daemon → bridge: `DaemonToBridge { oneof command { Start, Prompt, Close } }`
   - `Start { session_id, claude_path, resume_claude_session_id?, model?, cwd }` — `cwd` is where
     scouting starts for a new session, or the session's own directory when resuming
   - `Prompt { text }` — no turn id: the server sends a session's next prompt only after the
     current turn ends, so the daemon always knows which turn the bridge is running
-  - `Interrupt {}`, `Close {}` (end the input stream, finish, exit 0)
+  - `Close {}` (let the current turn finish, end the input stream, exit 0)
 - Bridge → daemon: `BridgeToDaemon { oneof event { Ready, SdkMessage, Error, Exited } }`
   - `Ready { protocol_version, bridge_version, sdk_version, runtime_version }` — sent first
   - `SdkMessage { json }` — the `SDKMessage` exactly as the SDK yielded it, `JSON.stringify`'d.
@@ -242,10 +242,9 @@ to). So a new session runs in two steps:
 The daemon learns the chosen directory from the session's `init` message (`SessionStarted.cwd`)
 and passes it back as `Start.cwd` when resuming, which skips scouting.
 
-`Interrupt` → `query.interrupt()`; during scouting it aborts scouting, starts the session in
-`Start.cwd` and interrupts that turn immediately, so every turn still ends with an SDK `result`.
-`Close` or stdin EOF lets the current turn finish (scouting included), then ends the input so
-the query finishes cleanly. Partial messages (`includePartialMessages`) stay off: nothing
+**No interrupts.** A turn runs until Claude finishes it. `Close` or stdin EOF lets the current
+turn finish (scouting included), then ends the input so the query finishes cleanly. The only
+way to stop a running turn is to kill the bridge, which fails the turn. Partial messages (`includePartialMessages`) stay off: nothing
 consumes them, and voice only needs finished steps.
 
 **Replay mode.** With `BLUE_BRIDGE_REPLAY=<recording>`, the bridge plays back one recorded turn
@@ -279,12 +278,12 @@ Server → daemon (`AttachResponse.oneof message`):
 | Message | Fields |
 |---|---|
 | `Welcome` | `machine_id, map<session_id, acked_seq>` — daemon trims/replays its outbox |
-| `Command` | `command_id` + `oneof { StartSession, SendPrompt, InterruptSession, CloseSession }` |
+| `Command` | `command_id` + `oneof { StartSession, SendPrompt, CloseSession }` |
 | `EventsAck` | `session_id, up_to_seq` — daemon deletes outbox rows ≤ seq |
 
 - `StartSession { session_id, resume_claude_session_id?, model? }`
 - `SendPrompt { session_id, turn_id, text }`
-- `InterruptSession { session_id }`, `CloseSession { session_id }`
+- `CloseSession { session_id }`
 
 Delivery guarantees:
 
@@ -306,7 +305,6 @@ Auth: `authorization: Bearer <token>` — the voice service token or a user sess
 | `ListSessions` | `machine?, active_only` → sessions |
 | `CreateSession` | `machine, instructions, title` → `session, turn_id` |
 | `SendPrompt` | `session_id, instructions` → `turn_id` (queued if a turn is running) |
-| `InterruptSession` | `session_id` → — |
 | `GetSession` | `session_id` → session + all its events (raw SDK messages excluded) |
 | `Subscribe` (server stream) | `cursor?, session_ids[], include_raw` → stream of `Event` |
 
@@ -368,7 +366,6 @@ tested against recorded fixtures). `SessionEvent` is a `oneof`:
 | `ToolFinished` | SDK `user` tool_result blocks | `tool_use_id, is_error` |
 | `TurnCompleted` | SDK `result` (success) | `turn_id, result_text, duration_ms, num_turns, cost_usd` |
 | `TurnFailed` | SDK `result` (error) / bridge crash | `turn_id, reason` |
-| `TurnInterrupted` | after interrupt | `turn_id` |
 | `SessionStateChanged` | daemon | `SessionState` enum: `STARTING, IDLE, RUNNING, CLOSED, FAILED` |
 | `RawSdkMessage` | every SDK message (if `forward_raw`) | `json` |
 
@@ -408,7 +405,7 @@ migrations), `livekit-api` (token minting), `reqwest` (GitHub device flow + `/us
 - Write path: `DaemonEvent` → insert (`ON CONFLICT DO NOTHING` on `(session_id, seq)`) →
   update session/turn rows → broadcast → `events.ack` to daemon.
 - Turn queue: if a `session.prompt` arrives while a turn is running, it is persisted as
-  `queued` and dispatched on the next `turn.completed`/`failed`/`interrupted`.
+  `queued` and dispatched on the next `turn.completed`/`failed`.
 - Graceful shutdown on SIGTERM: health → NOT_SERVING, end daemon/client streams, flush, exit.
 
 **Config (env):** `BLUE_DATABASE_URL`, `BLUE_PUBLIC_URL`,
@@ -430,7 +427,7 @@ machines       (id, name UNIQUE, token_hash, os, arch, daemon_version, bridge_ve
 pairing_codes  (code_hash PK, created_by, expires_at, claimed_at, machine_id)
 sessions       (id, machine_id FK, title, state, claude_session_id,
                 created_at, updated_at, last_activity_at)
-turns          (id, session_id FK, index, instructions, state  -- queued|running|completed|failed|interrupted
+turns          (id, session_id FK, index, instructions, state  -- queued|running|completed|failed
                 , result_text, cost_usd, duration_ms, error, created_at, started_at, finished_at)
 events         (id BIGSERIAL PK  -- global cursor
                 , session_id FK, turn_id FK NULL, seq, kind, payload JSONB, is_raw BOOL,
@@ -460,7 +457,7 @@ compiled into the bridge.)
 - `blue-daemon doctor` — checks: config valid, `claude` installed + version, bridge starts and
   reports a matching protocol version, server reachable and token accepted.
 - `blue-daemon session [--cwd DIR] [--resume ID] [--model M] [--record FILE | --replay FILE]` —
-  a Claude session in the terminal, no server: each line is a prompt, `/interrupt`, `/quit`.
+  a Claude session in the terminal, no server: each line is a prompt, `/quit` to end.
   For development and for recording test fixtures. (Phase 1; `just session`.)
 
 **Config:** `daemon.toml` in the OS config dir (`%APPDATA%\blue\` on Windows,
@@ -493,11 +490,10 @@ restricted permissions.
   kill-tree on drop.
 - `translate` (phase 1) — raw `SDKMessage` → events (§5.5), snapshot-tested on recordings.
   Claude Code repeats `init` every turn (reported once); `total_cost_usd` is cumulative (each
-  turn reports its difference); subagent messages are skipped; a `result` after the daemon
-  sent `Interrupt` is `TurnInterrupted`.
+  turn reports its difference); subagent messages are skipped; any unsuccessful `result` is
+  `TurnFailed`.
 - `recorder` (phase 1) — writes raw SDK messages to JSON lines, scrubbed for the public repo
-  (home dir → `<HOME>`, `init` reduced to the fields Blue uses, `rate_limit_event` dropped), with
-  `{"type":"blue_interrupt"}` marking where the daemon interrupted.
+  (home dir → `<HOME>`, `init` reduced to the fields Blue uses, `rate_limit_event` dropped).
 - `outbox` — SQLite (`sqlx` sqlite): `(session_id, seq, payload)`; append before send,
   delete on `events.ack`. Also stores `sessions(session_id, claude_session_id)` so a
   restarted daemon can resume.
@@ -542,7 +538,6 @@ auto-reconnects and resumes from its last cursor), a "focused session" id, and a
 | `start_task(machine, title, instructions)` | `CreateSession`; the LLM names the session (a few words); focuses it |
 | `send_follow_up(instructions, session=None)` | `SendPrompt` to focused or named session |
 | `get_status(session=None)` | `GetSession`; LLM summarizes the latest activity |
-| `interrupt(session=None)` | `InterruptSession` |
 | `focus_session(session)` | change focus by name/title/number |
 
 **Behavior (system prompt essentials):**
@@ -571,7 +566,7 @@ Text client over the same gRPC services (`ClientService` + `AuthService`):
 - `blue pair-code`, `blue machines [revoke <name>]`
 - `blue run <machine> "<instructions>" [--title <title>]` (title defaults to the start of the
   instructions) — create session, stream events to terminal
-- `blue send <session> "<instructions>"`, `blue interrupt <session>`, `blue sessions`,
+- `blue send <session> "<instructions>"`, `blue sessions`,
   `blue tail [--session]`
 - `blue token` — print a LiveKit room token (handy with Agents Playground)
 
@@ -729,13 +724,13 @@ Frontend during development: LiveKit Agents Playground, connecting with a token 
   real Claude by the live tests, scrubbed), run through `translate.rs`, snapshot-tested with
   `insta`. `just record-fixtures` refreshes them; review with `cargo insta review`.
 - **Live (opt-in, needs a Claude login, uses Haiku):** `just test-live` — real sessions through
-  the compiled bridge: scouting, several turns, interrupt mid-command, resume in a new bridge,
+  the compiled bridge: scouting, several turns, an edit, resume in a new bridge,
   and killing the bridge kills Claude and its shells (checked by PID *and* start time, since
   Windows reuses PIDs).
 - **Protocol:** `buf lint`; framing round-trip tests in Rust and TS; Python import/round-trip
   test; generated-code freshness check in CI; cross-language handshake (daemon ⇄ compiled bridge).
 - **Daemon:** `just test-replay` (in CI on Linux, macOS and Windows) — the daemon driving the
-  compiled bridge in replay mode through a recorded multi-turn session with an interrupt. Phase 2
+  compiled bridge in replay mode through a recorded multi-turn session. Phase 2
   adds outbox replay after a dropped server connection.
 - **Server:** integration tests against real Postgres (`testcontainers`), with an in-process fake
   daemon and fake client over real gRPC streams: routing, dedupe, turn queueing, reconnect
@@ -780,10 +775,10 @@ Cargo workspace, `proto/` with the v1 definitions, codegen for Rust/TS/Python, `
 `Ready` frame over protobuf; `blue health` gets SERVING from `blue-server serve`.
 
 **Phase 1 — Daemon ⇄ bridge on Windows (riskiest first)** ✅ *done*
-Bridge implemented; Rust spawns it, runs a multi-turn session in a scratch repo, interrupts,
-kills mid-turn, resumes with `claudeSessionId`. Verify `bun build --compile` works with the
+Bridge implemented; Rust spawns it, runs a multi-turn session in a scratch repo, kills
+mid-turn, resumes with `claudeSessionId`. Verify `bun build --compile` works with the
 SDK and an explicit `pathToClaudeCodeExecutable`. Record fixtures. Implement `translate.rs`.
-*Exit:* a Rust test binary drives three turns + interrupt + resume against real `claude`;
+*Exit:* a Rust test binary drives three turns + resume against real `claude`;
 translation snapshot tests pass on fixtures; process-tree kill verified on Windows.
 *Result:* all met (`just test-live`, `just test-replay`, snapshot tests). Also added: scouting
 for the working directory (§5.1), `blue-daemon session`, and replay mode in CI.
@@ -797,7 +792,7 @@ killing the server or the daemon mid-task loses no events.
 **Phase 3 — Voice agent (local worker)**
 Agent with tools, server client, notifier, system prompt; LiveKit Cloud project; Agents
 Playground with a server-minted token.
-*Exit:* by voice alone: start a task, ask status, follow up, interrupt, get a spoken completion
+*Exit:* by voice alone: start a task, ask status, follow up, get a spoken completion
 summary.
 
 **Phase 4 — Helm chart**

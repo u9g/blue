@@ -84,8 +84,7 @@ message Command {
   oneof command {
     StartSession start_session = 2;
     SendPrompt send_prompt = 3;
-    InterruptSession interrupt_session = 4;
-    CloseSession close_session = 5;
+    CloseSession close_session = 4;
   }
 }
 
@@ -99,10 +98,6 @@ message SendPrompt {
   string session_id = 1;
   string turn_id = 2;
   string text = 3;
-}
-
-message InterruptSession {
-  string session_id = 1;
 }
 
 message CloseSession {

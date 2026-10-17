@@ -1,5 +1,5 @@
 //! The daemon driving the compiled bridge in replay mode: the whole session path (process
-//! spawn, framing, Start/Prompt/Interrupt/Close, translation, turn tracking) without Claude.
+//! spawn, framing, Start/Prompt/Close, translation, turn tracking) without Claude.
 //! Ignored by default because it needs the compiled bridge; `just test-replay` builds it and
 //! runs this.
 
@@ -25,10 +25,7 @@ async fn next_turn_end(session: &mut Session) -> Kind {
         loop {
             let event = session.next().await.expect("session ended early");
             match event.event.and_then(|e| e.kind) {
-                Some(
-                    kind
-                    @ (Kind::TurnCompleted(_) | Kind::TurnFailed(_) | Kind::TurnInterrupted(_)),
-                ) => return kind,
+                Some(kind @ (Kind::TurnCompleted(_) | Kind::TurnFailed(_))) => return kind,
                 _ => continue,
             }
         }
@@ -54,19 +51,14 @@ async fn replays_a_recorded_session() {
     .await
     .unwrap();
 
-    for (turn, interrupt) in [("t1", false), ("t2", false), ("t3", true), ("t4", false)] {
+    for turn in ["t1", "t2", "t3"] {
         session
             .prompt(turn.into(), "replayed".into())
             .await
             .unwrap();
-        if interrupt {
-            session.interrupt().await.unwrap();
-        }
-        let end = next_turn_end(&mut session).await;
-        match (interrupt, &end) {
-            (false, Kind::TurnCompleted(done)) => assert_eq!(done.turn_id, turn),
-            (true, Kind::TurnInterrupted(stopped)) => assert_eq!(stopped.turn_id, turn),
-            _ => panic!("turn {turn}: unexpected {end:?}"),
+        match next_turn_end(&mut session).await {
+            Kind::TurnCompleted(done) => assert_eq!(done.turn_id, turn),
+            other => panic!("turn {turn}: unexpected {other:?}"),
         }
     }
     assert!(session.cwd().ends_with("calc"), "{}", session.cwd());

@@ -2,19 +2,16 @@
 source: crates/daemon/tests/translate_fixtures.rs
 expression: "translate_fixture(\"turns\")"
 ---
-SessionStarted model=claude-haiku-5-5 cwd=<HOME>\AppData\Local\Temp\.tmpLfGQ3V\calc
-ToolStarted Glob "Glob **/calc.py"
-ToolFinished is_error=false
-ToolStarted Read "Read calc.py"
+SessionStarted model=claude-haiku-5-5 cwd=<HOME>\AppData\Local\Temp\.tmpOaIUZl\calc
+ToolStarted Grep "Grep ^\\s*def\\s+\\w+"
 ToolFinished is_error=false
 AssistantText "add"
-TurnCompleted t1 num_turns=3 result="add"
+TurnCompleted t1 num_turns=2 result="add"
+ToolStarted Read "Read calc.py"
+ToolFinished is_error=false
 ToolStarted Edit "Edit calc.py"
 ToolFinished is_error=false
-AssistantText "I added `subtract(a, b)` to `calc.py`, returning `a - b`, below `add`. I didn't commit it."
-TurnCompleted t2 num_turns=2 result="I added `subtract(a, b)` to `calc.py`, returning `a - b`, below `add`. I didn't commit it."
-ToolStarted Bash "Bash: Echo started, sleep 120 seconds, echo finished"
-ToolFinished is_error=true
-TurnInterrupted t3
+AssistantText "I added `subtract(a, b)` to `calc.py`, returning `a - b`, below `add`. I haven't committed."
+TurnCompleted t2 num_turns=3 result="I added `subtract(a, b)` to `calc.py`, returning `a - b`, below `add`. I haven't committed."
 AssistantText "ok"
-TurnCompleted t4 num_turns=1 result="ok"
+TurnCompleted t3 num_turns=1 result="ok"

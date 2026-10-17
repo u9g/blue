@@ -41,7 +41,6 @@ def test_client_stub_exposes_every_rpc() -> None:
         "ListSessions",
         "CreateSession",
         "SendPrompt",
-        "InterruptSession",
         "GetSession",
         "Subscribe",
     }

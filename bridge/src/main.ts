@@ -58,9 +58,6 @@ async function main(): Promise<never> {
         if (session) session.prompt(command.value.text);
         else await error("Prompt before Start");
         break;
-      case "interrupt":
-        await session?.interrupt();
-        break;
       case "close":
         await session?.close();
         return exit(undefined);

@@ -5,18 +5,11 @@
 
 use blue_protocol::events::v1::{
     AssistantText, SessionEvent, SessionStarted, ToolFinished, ToolStarted, TurnCompleted,
-    TurnFailed, TurnInterrupted, session_event::Kind,
+    TurnFailed, session_event::Kind,
 };
 use serde_json::Value;
 
 const SUMMARY_MAX_CHARS: usize = 100;
-
-/// The turn a message belongs to, as tracked by the session.
-pub struct Turn<'a> {
-    pub id: &'a str,
-    /// The user interrupted this turn, so its `result` means "interrupted", not "failed".
-    pub interrupted: bool,
-}
 
 #[derive(Default)]
 pub struct Translator {
@@ -35,8 +28,8 @@ impl Translator {
         &self.cwd
     }
 
-    /// Translates one SDK message. `turn` is the turn in progress, if any.
-    pub fn translate(&mut self, json: &str, turn: Option<Turn<'_>>) -> Vec<SessionEvent> {
+    /// Translates one SDK message. `turn_id` is the turn in progress, if any.
+    pub fn translate(&mut self, json: &str, turn_id: Option<&str>) -> Vec<SessionEvent> {
         let Ok(message) = serde_json::from_str::<Value>(json) else {
             tracing::warn!("bridge sent an SDK message that isn't JSON");
             return Vec::new();
@@ -47,7 +40,7 @@ impl Translator {
             // conversation is reported.
             "assistant" if message["parent_tool_use_id"].is_null() => self.assistant(&message),
             "user" if message["parent_tool_use_id"].is_null() => tool_results(&message),
-            "result" => self.result(&message, turn),
+            "result" => self.result(&message, turn_id),
             _ => Vec::new(),
         };
         kinds
@@ -95,21 +88,16 @@ impl Translator {
             .collect()
     }
 
-    fn result(&mut self, message: &Value, turn: Option<Turn<'_>>) -> Vec<Kind> {
+    fn result(&mut self, message: &Value, turn_id: Option<&str>) -> Vec<Kind> {
         let total_cost = message["total_cost_usd"].as_f64();
         let cost = total_cost.map(|total| (total - self.cost_so_far).max(0.0));
         if let Some(total) = total_cost {
             self.cost_so_far = total;
         }
-        let Some(turn) = turn else {
+        let Some(turn_id) = turn_id.map(str::to_owned) else {
             tracing::warn!("SDK result arrived with no turn in progress");
             return Vec::new();
         };
-        let turn_id = turn.id.to_owned();
-
-        if turn.interrupted {
-            return vec![Kind::TurnInterrupted(TurnInterrupted { turn_id })];
-        }
         if str_field(message, "subtype") == "success" && message["is_error"] != true {
             return vec![Kind::TurnCompleted(TurnCompleted {
                 turn_id,
@@ -211,19 +199,12 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn kinds(translator: &mut Translator, message: Value, turn: Option<Turn<'_>>) -> Vec<Kind> {
+    fn kinds(translator: &mut Translator, message: Value, turn: Option<&str>) -> Vec<Kind> {
         translator
             .translate(&message.to_string(), turn)
             .into_iter()
             .filter_map(|event| event.kind)
             .collect()
-    }
-
-    fn turn(id: &str) -> Option<Turn<'_>> {
-        Some(Turn {
-            id,
-            interrupted: false,
-        })
     }
 
     #[test]
@@ -243,26 +224,18 @@ mod tests {
             [Kind::TurnCompleted(done)] => done.cost_usd.unwrap(),
             other => panic!("{other:?}"),
         };
-        assert!((cost(kinds(&mut t, result(0.10), turn("t1"))) - 0.10).abs() < 1e-9);
-        assert!((cost(kinds(&mut t, result(0.25), turn("t2"))) - 0.15).abs() < 1e-9);
+        assert!((cost(kinds(&mut t, result(0.10), Some("t1"))) - 0.10).abs() < 1e-9);
+        assert!((cost(kinds(&mut t, result(0.25), Some("t2"))) - 0.15).abs() < 1e-9);
     }
 
     #[test]
-    fn result_after_interrupt_is_interrupted() {
+    fn unsuccessful_result_fails_the_turn() {
         let mut t = Translator::default();
-        let result =
-            json!({"type": "result", "subtype": "error_during_execution", "is_error": true});
-        let interrupted = Some(Turn {
-            id: "t1",
-            interrupted: true,
-        });
+        let result = json!({"type": "result", "subtype": "error_max_turns", "is_error": true,
+            "errors": ["hit max turns"]});
         assert!(matches!(
-            &kinds(&mut t, result.clone(), interrupted)[..],
-            [Kind::TurnInterrupted(_)]
-        ));
-        assert!(matches!(
-            &kinds(&mut t, result, turn("t2"))[..],
-            [Kind::TurnFailed(_)]
+            &kinds(&mut t, result, Some("t1"))[..],
+            [Kind::TurnFailed(failed)] if failed.reason == "hit max turns"
         ));
     }
 
@@ -271,7 +244,7 @@ mod tests {
         let mut t = Translator::default();
         let message = json!({"type": "assistant", "parent_tool_use_id": "toolu_1",
             "message": {"content": [{"type": "text", "text": "inner"}]}});
-        assert!(kinds(&mut t, message, turn("t1")).is_empty());
+        assert!(kinds(&mut t, message, Some("t1")).is_empty());
     }
 
     #[test]

@@ -14,7 +14,7 @@ export class ReplaySession implements BridgeSession {
   constructor(path: string) {
     let turn: string[] = [];
     for (const line of readFileSync(path, "utf8").split("\n")) {
-      if (!line.trim() || JSON.parse(line).type === "blue_interrupt") continue;
+      if (!line.trim()) continue;
       turn.push(line);
       if (JSON.parse(line).type === "result") {
         this.turns.push(turn);
@@ -33,8 +33,6 @@ export class ReplaySession implements BridgeSession {
       for (const json of turn) await send({ case: "sdkMessage", value: { json } });
     });
   }
-
-  async interrupt(): Promise<void> {}
 
   async close(): Promise<void> {
     await this.playing;

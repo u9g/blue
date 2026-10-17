@@ -4,10 +4,6 @@
 //! Recordings are scrubbed because fixtures are committed to a public repo: the home directory
 //! becomes `<HOME>`, `init` keeps only the fields Blue uses (dropping the machine's tool, MCP
 //! server, plugin and agent lists), and `rate_limit_event` (account usage) is dropped.
-//!
-//! Besides SDK messages, a recording marks where the daemon interrupted a turn with a
-//! `{"type":"blue_interrupt"}` line, so tests know the `result` that follows means "interrupted".
-//! The translator ignores it like any unknown message type.
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -26,8 +22,6 @@ const INIT_FIELDS: &[&str] = &[
     "claude_code_version",
 ];
 
-pub const INTERRUPT_MARKER: &str = r#"{"type":"blue_interrupt"}"#;
-
 pub struct Recorder {
     out: BufWriter<File>,
     home: Option<String>,
@@ -42,16 +36,9 @@ impl Recorder {
     }
 
     pub fn record(&mut self, json: &str) {
-        if let Some(line) = scrub(json, self.home.as_deref()) {
-            self.write(&line);
-        }
-    }
-
-    pub fn record_interrupt(&mut self) {
-        self.write(INTERRUPT_MARKER);
-    }
-
-    fn write(&mut self, line: &str) {
+        let Some(line) = scrub(json, self.home.as_deref()) else {
+            return;
+        };
         if let Err(err) = writeln!(self.out, "{line}").and_then(|()| self.out.flush()) {
             tracing::warn!("recording failed: {err}");
         }

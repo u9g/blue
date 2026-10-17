@@ -11,7 +11,6 @@ import { baseOptions, userMessage } from "./sdk.ts";
 /** What main.ts drives: a live Session, or a ReplaySession in replay mode. */
 export interface BridgeSession {
   prompt(text: string): void;
-  interrupt(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -21,8 +20,6 @@ export class Session implements BridgeSession {
   private forwarding: Promise<void> = Promise.resolve();
   // Prompts are handled one after another; the first may include scouting.
   private prompts: Promise<void> = Promise.resolve();
-  private scouting: AbortController | undefined;
-  private interruptAfterStart = false;
 
   constructor(
     private readonly start: Start,
@@ -35,23 +32,8 @@ export class Session implements BridgeSession {
       .then(async () => {
         if (!this.sdkQuery) this.startQuery(await this.chooseDirectory(text));
         this.input.push(userMessage(text));
-        if (this.interruptAfterStart) {
-          this.interruptAfterStart = false;
-          await this.sdkQuery!.interrupt();
-        }
       })
       .catch(this.fatal);
-  }
-
-  async interrupt(): Promise<void> {
-    if (this.scouting) {
-      // Stop scouting, start the session in the starting directory, and interrupt that turn
-      // right away so the daemon still sees the turn end with an SDK result.
-      this.interruptAfterStart = true;
-      this.scouting.abort();
-    } else if (this.sdkQuery) {
-      await this.sdkQuery.interrupt();
-    }
   }
 
   /** Lets the current turn finish (scouting included), then ends the input stream and waits
@@ -66,28 +48,16 @@ export class Session implements BridgeSession {
     const { cwd, claudePath, resumeClaudeSessionId } = this.start;
     if (resumeClaudeSessionId !== undefined) return cwd;
 
-    this.scouting = new AbortController();
-    try {
-      const chosen = await scoutProjectDirectory({
-        request: firstPrompt,
-        startDir: cwd,
-        claudePath,
-        signal: this.scouting.signal,
-      });
-      if (chosen) {
-        log(`project directory: ${chosen}`);
-        return chosen;
-      }
-      if (!this.scouting.signal.aborted) {
-        await send({
-          case: "error",
-          value: { message: `Couldn't pick a project directory; working in ${cwd}.` },
-        });
-      }
-      return cwd;
-    } finally {
-      this.scouting = undefined;
+    const chosen = await scoutProjectDirectory({ request: firstPrompt, startDir: cwd, claudePath });
+    if (chosen) {
+      log(`project directory: ${chosen}`);
+      return chosen;
     }
+    await send({
+      case: "error",
+      value: { message: `Couldn't pick a project directory; working in ${cwd}.` },
+    });
+    return cwd;
   }
 
   private startQuery(cwd: string): void {

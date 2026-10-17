@@ -1,14 +1,10 @@
 //! Snapshot tests: recorded SDK message streams (tests/fixtures/*.jsonl, captured from real
 //! Claude by `just record-fixtures`) translated into Blue session events.
-//!
-//! Recordings mark where the daemon interrupted a turn (`recorder::INTERRUPT_MARKER`), which is
-//! what tells the translator that the next `result` means "interrupted".
 
 use std::fmt::Write;
 use std::path::Path;
 
-use blue_daemon::recorder::INTERRUPT_MARKER;
-use blue_daemon::translate::{Translator, Turn};
+use blue_daemon::translate::Translator;
 use blue_protocol::events::v1::session_event::Kind;
 
 fn translate_fixture(name: &str) -> String {
@@ -20,29 +16,17 @@ fn translate_fixture(name: &str) -> String {
     let mut translator = Translator::default();
     let mut out = String::new();
     let mut turn = 1;
-    let mut interrupted = false;
     for line in recording.lines().filter(|line| !line.trim().is_empty()) {
-        if line == INTERRUPT_MARKER {
-            interrupted = true;
-            continue;
-        }
         let turn_id = format!("t{turn}");
-        let events = translator.translate(
-            line,
-            Some(Turn {
-                id: &turn_id,
-                interrupted,
-            }),
-        );
-        for kind in events.into_iter().filter_map(|event| event.kind) {
-            let ends_turn = matches!(
-                kind,
-                Kind::TurnCompleted(_) | Kind::TurnFailed(_) | Kind::TurnInterrupted(_)
-            );
+        for kind in translator
+            .translate(line, Some(&turn_id))
+            .into_iter()
+            .filter_map(|event| event.kind)
+        {
+            let ends_turn = matches!(kind, Kind::TurnCompleted(_) | Kind::TurnFailed(_));
             writeln!(out, "{}", describe(kind)).unwrap();
             if ends_turn {
                 turn += 1;
-                interrupted = false;
             }
         }
     }
@@ -60,7 +44,6 @@ fn describe(kind: Kind) -> String {
             e.turn_id, e.num_turns, e.result_text
         ),
         Kind::TurnFailed(e) => format!("TurnFailed {} {:?}", e.turn_id, e.reason),
-        Kind::TurnInterrupted(e) => format!("TurnInterrupted {}", e.turn_id),
         other => format!("{other:?}"),
     }
 }
